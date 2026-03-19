@@ -1,14 +1,9 @@
-# global aggregator
-kubectl label --overwrite nodes ga fl/type=global_aggregator
+kubectl label --overwrite nodes rpi4-5 fl/type=global_aggregator
 
-# local aggregator
-kubectl label --overwrite nodes la-1 fl/type=local_aggregator
-kubectl label --overwrite nodes la-1 comm/ga=100
+kubectl label --overwrite nodes orinnano-2 fl/type=client
+kubectl label --overwrite nodes orinnano-3 fl/type=client
+kubectl label --overwrite nodes orinnano-4 fl/type=client
 
-# client
-kubectl label --overwrite nodes cl-1 fl/type=client
-kubectl label --overwrite nodes cl-1 comm/ga=120
-kubectl label --overwrite nodes cl-1 comm/la-1=20
-kubectl label --overwrite nodes cl-1 comm/la-2=60
-kubectl label --overwrite nodes cl-1 fl/num-partitions=10
-kubectl label --overwrite nodes cl-1 fl/partition-id=0
+kubectl label --overwrite nodes orinnano-2 comm/rpi4-5=100 fl/num-partitions=3 fl/partition-id=0
+kubectl label --overwrite nodes orinnano-3 comm/rpi4-5=100 fl/num-partitions=3 fl/partition-id=1
+kubectl label --overwrite nodes orinnano-4 comm/rpi4-5=100 fl/num-partitions=3 fl/partition-id=2

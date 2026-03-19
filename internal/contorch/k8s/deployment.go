@@ -11,11 +11,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func BuildGlobalAggregatorDeployment(aggregator *model.FlAggregator) *appsv1.Deployment {
-	deployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: common.GLOBAL_AGGRETATOR_DEPLOYMENT_NAME,
-		},
+func BuildGlobalAggregatorDeployment(aggregator *model.FlAggregator, namespace string) *appsv1.Deployment {
+       deployment := &appsv1.Deployment{
+	       ObjectMeta: metav1.ObjectMeta{
+		       Name:      common.GetGlobalAggregatorDeploymentName(aggregator.Id),
+		       Namespace: namespace,
+	       },
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -46,8 +47,17 @@ func BuildGlobalAggregatorDeployment(aggregator *model.FlAggregator) *appsv1.Dep
 								},
 								{
 									Name:      "gaconfig",
+									MountPath: "/home/global_server.py",
+									SubPath:   "global_server.py",
+								},
+								{
+									Name:      "gaconfig",
 									MountPath: "/home/global_server_config.yaml",
 									SubPath:   "global_server_config.yaml",
+								},
+								{
+									Name:      "modelstorage",
+									MountPath: "/home/model",
 								},
 							},
 							Resources: corev1.ResourceRequirements{
@@ -74,6 +84,14 @@ func BuildGlobalAggregatorDeployment(aggregator *model.FlAggregator) *appsv1.Dep
 								},
 							},
 						},
+						{
+							Name: "modelstorage",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: common.GetGlobalAggregatorPVCName(aggregator.Id),
+								},
+							},
+						},
 					},
 				},
 			},
@@ -83,11 +101,12 @@ func BuildGlobalAggregatorDeployment(aggregator *model.FlAggregator) *appsv1.Dep
 	return deployment
 }
 
-func BuildLocalAggregatorDeployment(aggregator *model.FlAggregator) *appsv1.Deployment {
-	deployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: common.GetLocalAggregatorDeploymentName(aggregator.Id),
-		},
+func BuildLocalAggregatorDeployment(aggregator *model.FlAggregator, namespace string) *appsv1.Deployment {
+       deployment := &appsv1.Deployment{
+	       ObjectMeta: metav1.ObjectMeta{
+		       Name:      common.GetLocalAggregatorDeploymentName(aggregator.Id),
+		       Namespace: namespace,
+	       },
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -116,6 +135,10 @@ func BuildLocalAggregatorDeployment(aggregator *model.FlAggregator) *appsv1.Depl
 									MountPath: "/home/local_server_config.yaml",
 									SubPath:   "local_server_config.yaml",
 								},
+								{
+									Name:      "modelstorage",
+									MountPath: "/home/model",
+								},
 							},
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
@@ -141,6 +164,14 @@ func BuildLocalAggregatorDeployment(aggregator *model.FlAggregator) *appsv1.Depl
 								},
 							},
 						},
+						{
+							Name: "modelstorage",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: common.GetLocalAggregatorPVCName(aggregator.Id),
+								},
+							},
+						},
 					},
 				},
 			},
@@ -150,10 +181,11 @@ func BuildLocalAggregatorDeployment(aggregator *model.FlAggregator) *appsv1.Depl
 	return deployment
 }
 
-func BuildClientDeployment(client *model.FlClient) *appsv1.Deployment {
+func BuildClientDeployment(client *model.FlClient, namespace string) *appsv1.Deployment {
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: common.GetClientDeploymentName(client.Id),
+			Name:      common.GetClientDeploymentName(client.Id),
+			Namespace: namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
@@ -180,8 +212,17 @@ func BuildClientDeployment(client *model.FlClient) *appsv1.Deployment {
 								},
 								{
 									Name:      "clientconfig",
+									MountPath: "/home/client.py",
+									SubPath:   "client.py",
+								},
+								{
+									Name:      "clientconfig",
 									MountPath: "/home/client_config.yaml",
 									SubPath:   "client_config.yaml",
+								},
+								{
+									Name:      "modelstorage",
+									MountPath: "/home/model",
 								},
 							},
 							Resources: corev1.ResourceRequirements{
@@ -205,6 +246,14 @@ func BuildClientDeployment(client *model.FlClient) *appsv1.Deployment {
 									LocalObjectReference: corev1.LocalObjectReference{
 										Name: common.GetClientConfigMapName(client.Id),
 									},
+								},
+							},
+						},
+						{
+							Name: "modelstorage",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: common.GetClientPVCName(client.Id),
 								},
 							},
 						},

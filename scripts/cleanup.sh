@@ -12,3 +12,5 @@ echo "Deleting all resources in namespace: $NAMESPACE"
 kubectl -n "$NAMESPACE" delete deployments --all
 kubectl -n "$NAMESPACE" delete configmap --all
 kubectl -n "$NAMESPACE" delete svc --all
+kubectl -n "$NAMESPACE" delete pvc --all
+kubectl delete pv --all

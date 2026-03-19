@@ -10,6 +10,7 @@ import (
 
 func BuildGlobalAggregatorConfigFiles(flAggregator *model.FlAggregator) (map[string]string, error) {
 	configDirectoryPath := "../../configs/fl/"
+	buildImagesPath := "../../internal/build_images/global_server/"
 
 	taskBytesArray, err := os.ReadFile(fmt.Sprint(configDirectoryPath, "task/task.py"))
 	if err != nil {
@@ -17,10 +18,17 @@ func BuildGlobalAggregatorConfigFiles(flAggregator *model.FlAggregator) (map[str
 	}
 	taskString := string(taskBytesArray)
 
+	globalsrvBytesArray, err := os.ReadFile(fmt.Sprint(buildImagesPath, "global_server.py"))
+	if err != nil {
+		fmt.Print(err)
+	}
+	globalsrvString := string(globalsrvBytesArray)
+
 	globalAggregatorConfig := GlobalAggregatorConfig_Yaml
 
 	filesData := map[string]string{
 		"task.py":                   taskString,
+		"global_server.py":          globalsrvString,
 		"global_server_config.yaml": globalAggregatorConfig,
 	}
 
@@ -39,6 +47,7 @@ func BuildLocalAggregatorConfigFiles(flAggregator *model.FlAggregator) (map[stri
 
 func BuildClientConfigFiles(client *model.FlClient) (map[string]string, error) {
 	configDirectoryPath := "../../configs/fl/"
+	buildImagesPath := "../../internal/build_images/client/"
 
 	taskBytesArray, err := os.ReadFile(fmt.Sprint(configDirectoryPath, "task/task.py"))
 	if err != nil {
@@ -46,12 +55,19 @@ func BuildClientConfigFiles(client *model.FlClient) (map[string]string, error) {
 	}
 	taskString := string(taskBytesArray)
 
+	clientpyBytesArray, err := os.ReadFile(fmt.Sprint(buildImagesPath, "client.py"))
+	if err != nil {
+		fmt.Print(err)
+	}
+	clientpyString := string(clientpyBytesArray)
+
 	clientConfigString := fmt.Sprintf(ClientConfig_Yaml, client.ParentAddress, strconv.Itoa(int(client.PartitionId)),
 		strconv.Itoa(int(client.NumPartitions)), strconv.Itoa(int(client.Epochs)), strconv.Itoa(int(client.BatchSize)),
 		fmt.Sprintf("%f", client.LearningRate))
 
 	filesData := map[string]string{
 		"task.py":            taskString,
+		"client.py":          clientpyString,
 		"client_config.yaml": clientConfigString,
 	}
 

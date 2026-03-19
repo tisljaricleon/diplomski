@@ -167,14 +167,25 @@ func (orch *K8sOrchestrator) CreateGlobalAggregator(aggregator *model.FlAggregat
 		return err
 	}
 
-	deployment := BuildGlobalAggregatorDeployment(aggregator)
+	pvc := BuildGlobalAggregatorPVC(aggregator.Id, orch.namespace)
+	err = orch.createPersistentVolumeClaim(pvc)
+	if err != nil {
+		return err
+	}
+
+	pv := BuildGlobalAggregatorPV(aggregator.Id, orch.namespace)
+	err = orch.createPersistentVolume(pv)
+	if err != nil {
+		return err
+	}
+
+	deployment := BuildGlobalAggregatorDeployment(aggregator, orch.namespace)
 	if !orch.simulation {
 		deployment.Spec.Template.Spec.NodeName = aggregator.Id
 	} else {
 		deployment.Spec.Template.Spec.NodeName = orch.simulationNodes[orch.lastSimulationNode]
 		orch.lastSimulationNode++
 	}
-
 	err = orch.createDeployment(deployment)
 	if err != nil {
 		return err
@@ -189,50 +200,13 @@ func (orch *K8sOrchestrator) CreateGlobalAggregator(aggregator *model.FlAggregat
 	return nil
 }
 
-func (orch *K8sOrchestrator) GetGlobalAggregatorLogs() (bytes.Buffer, error) {
-	// Get the deployment
-	deployment, err := orch.clientset.AppsV1().Deployments(orch.namespace).Get(context.TODO(),
-		common.GLOBAL_AGGRETATOR_DEPLOYMENT_NAME, metav1.GetOptions{})
-	if err != nil {
-		return bytes.Buffer{}, fmt.Errorf("error retrieving deployment: %v", err)
-	}
-
-	// Get the selector from the deployment
-	labelSelector := metav1.FormatLabelSelector(deployment.Spec.Selector)
-
-	// List pods with the same labels
-	podList, err := orch.clientset.CoreV1().Pods(orch.namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: labelSelector,
-	})
-	if err != nil {
-		return bytes.Buffer{}, fmt.Errorf("error listing pods: %v", err)
-	}
-
-	// Get the logs of the pod
-	req := orch.clientset.CoreV1().Pods(orch.namespace).GetLogs(podList.Items[0].Name, &corev1.PodLogOptions{})
-	logs, err := req.Stream(context.TODO())
-	if err != nil {
-		return bytes.Buffer{}, err
-	}
-	defer logs.Close()
-
-	// Read the logs into a buffer
-	var buf bytes.Buffer
-	_, err = buf.ReadFrom(logs)
-	if err != nil {
-		return bytes.Buffer{}, err
-	}
-
-	return buf, nil
-}
-
 func (orch *K8sOrchestrator) RemoveGlobalAggregator(aggregator *model.FlAggregator) error {
 	err := orch.deleteService(common.GetGlobalAggregatorServiceName(aggregator.Id))
 	if err != nil {
 		return err
 	}
 
-	err = orch.deleteDeployment(common.GLOBAL_AGGRETATOR_DEPLOYMENT_NAME)
+	err = orch.deleteDeployment(common.GetGlobalAggregatorDeploymentName(aggregator.Id))
 	if err != nil {
 		return err
 	}
@@ -241,6 +215,16 @@ func (orch *K8sOrchestrator) RemoveGlobalAggregator(aggregator *model.FlAggregat
 	if err != nil {
 		return err
 	}
+
+    err = orch.deletePersistentVolumeClaim(common.GetGlobalAggregatorPersistentVolumeClaimName(aggregator.Id), orch.namespace)
+    if err != nil {
+        return err
+    }
+
+    err = orch.deletePersistentVolume(common.GetGlobalAggregatorPersistentVolumeName(aggregator.Id))
+    if err != nil {
+        return err
+    }
 
 	return nil
 }
@@ -251,7 +235,19 @@ func (orch *K8sOrchestrator) CreateLocalAggregator(aggregator *model.FlAggregato
 		return err
 	}
 
-	deployment := BuildLocalAggregatorDeployment(aggregator)
+	pvc := BuildLocalAggregatorPVC(aggregator.Id, orch.namespace)
+	err = orch.createPersistentVolumeClaim(pvc)
+	if err != nil {
+		return err
+	}
+
+	pv := BuildLocalAggregatorPV(aggregator.Id, orch.namespace)
+	err = orch.createPersistentVolume(pv)
+	if err != nil {
+		return err
+	}
+
+	deployment := BuildLocalAggregatorDeployment(aggregator, orch.namespace)
 	if !orch.simulation {
 		deployment.Spec.Template.Spec.NodeName = aggregator.Id
 	} else {
@@ -289,6 +285,16 @@ func (orch *K8sOrchestrator) RemoveLocalAggregator(aggregator *model.FlAggregato
 		return err
 	}
 
+	err = orch.deletePersistentVolumeClaim(common.GetLocalAggregatorPersistentVolumeClaimName(aggregator.Id), orch.namespace)
+	if err != nil {
+		return err
+	}
+
+	err = orch.deletePersistentVolume(common.GetLocalAggregatorPersistentVolumeName(aggregator.Id))
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -298,7 +304,19 @@ func (orch *K8sOrchestrator) CreateFlClient(client *model.FlClient, configFiles 
 		return err
 	}
 
-	deployment := BuildClientDeployment(client)
+	pvc := BuildClientPVC(client.Id, orch.namespace)
+	err = orch.createPersistentVolumeClaim(pvc)
+	if err != nil {
+		return err
+	}
+
+	pv := BuildClientPV(client.Id, orch.namespace)
+	err = orch.createPersistentVolume(pv)
+	if err != nil {
+		return err
+	}
+
+	deployment := BuildClientDeployment(client, orch.namespace)
 	if !orch.simulation {
 		deployment.Spec.Template.Spec.NodeName = client.Id
 	} else {
@@ -308,7 +326,6 @@ func (orch *K8sOrchestrator) CreateFlClient(client *model.FlClient, configFiles 
 			orch.lastSimulationNode = 3
 		}
 	}
-
 	err = orch.createDeployment(deployment)
 	if err != nil {
 		return err
@@ -324,6 +341,16 @@ func (orch *K8sOrchestrator) RemoveClient(client *model.FlClient) error {
 	}
 
 	err = orch.deleteConfigMap(common.GetClientConfigMapName(client.Id))
+	if err != nil {
+		return err
+	}
+
+	err = orch.deletePersistentVolumeClaim(common.GetClientPersistentVolumeClaimName(client.Id), orch.namespace)
+	if err != nil {
+		return err
+	}
+
+	err = orch.deletePersistentVolume(common.GetClientPersistentVolumeName(client.Id))
 	if err != nil {
 		return err
 	}
@@ -393,7 +420,53 @@ func (orch *K8sOrchestrator) createService(service *corev1.Service) error {
 func (orch *K8sOrchestrator) deleteService(serviceName string) error {
 	servicesClient := orch.clientset.CoreV1().Services(orch.namespace)
 
-	if err := servicesClient.Delete(context.TODO(), serviceName, metav1.DeleteOptions{}); err != nil {
+	err := servicesClient.Delete(context.TODO(), serviceName, metav1.DeleteOptions{}); 
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (orch *K8sOrchestrator) createPersistentVolume(pv *corev1.PersistentVolume) error {
+	persistantVolumesClient := orch.clientset.CoreV1().PersistentVolumes()
+
+	_, err := persistantVolumesClient.Create(context.TODO(), pv, metav1.CreateOptions{})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (orch *K8sOrchestrator) deletePersistentVolume(pvName string) error {
+	persistantVolumesClient := orch.clientset.CoreV1().PersistentVolumes()
+
+	err := persistantVolumesClient.Delete(context.TODO(), pvName, metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (orch *K8sOrchestrator) createPersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim) error {
+	persistentVolumeClaimsClient := orch.clientset.CoreV1().PersistentVolumeClaims(orch.namespace)
+
+	_, err := persistentVolumeClaimsClient.Create(context.TODO(), pvc, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (orch *K8sOrchestrator) deletePersistentVolumeClaim(pvcName, pvcNamespace string) error {
+	persistentVolumeClaimsClient := orch.clientset.CoreV1().PersistentVolumeClaims(pvcNamespace)
+
+	err := persistentVolumeClaimsClient.Delete(context.TODO(), pvcName, metav1.DeleteOptions{})
+	if err != nil {
 		return err
 	}
 
@@ -500,6 +573,44 @@ func getHostIp(node corev1.Node) string {
 
 	return ""
 }
+
+func (orch *K8sOrchestrator) GetGlobalAggregatorLogs() (bytes.Buffer, error) {
+	// Get the deployment
+	deployment, err := orch.clientset.AppsV1().Deployments(orch.namespace).Get(context.TODO(),
+		common.GetGlobalAggregatorDeploymentName(aggregator.Id), metav1.GetOptions{})
+	if err != nil {
+		return bytes.Buffer{}, fmt.Errorf("error retrieving deployment: %v", err)
+	}
+
+	// Get the selector from the deployment
+	labelSelector := metav1.FormatLabelSelector(deployment.Spec.Selector)
+
+	// List pods with the same labels
+	podList, err := orch.clientset.CoreV1().Pods(orch.namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return bytes.Buffer{}, fmt.Errorf("error listing pods: %v", err)
+	}
+
+	// Get the logs of the pod
+	req := orch.clientset.CoreV1().Pods(orch.namespace).GetLogs(podList.Items[0].Name, &corev1.PodLogOptions{})
+	logs, err := req.Stream(context.TODO())
+	if err != nil {
+		return bytes.Buffer{}, err
+	}
+	defer logs.Close()
+
+	// Read the logs into a buffer
+	var buf bytes.Buffer
+	_, err = buf.ReadFrom(logs)
+	if err != nil {
+		return bytes.Buffer{}, err
+	}
+
+	return buf, nil
+}
+
 func (orch *K8sOrchestrator) GetClientLogs(clientId string) (bytes.Buffer, error) {
 	// Get the deployment
 	deployment, err := orch.clientset.AppsV1().Deployments(corev1.NamespaceDefault).Get(context.TODO(),

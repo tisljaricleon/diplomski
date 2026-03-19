@@ -151,8 +151,12 @@ func GetClientInArray(clients []*model.FlClient, clientId string) *model.FlClien
 	return &model.FlClient{}
 }
 
+func GetGlobalAggregatorDeploymentName(aggregatorId string) string {
+	return fmt.Sprintf("%s-%s", GLOBAL_AGGRETATOR_DEPLOYMENT_PREFIX, aggregatorId)
+}
+
 func GetGlobalAggregatorServiceName(aggregatorId string) string {
-	return fmt.Sprintf("%s-%s", GLOBAL_AGGREGATOR_SERVICE_NAME, aggregatorId)
+	return fmt.Sprintf("%s-%s", GLOBAL_AGGREGATOR_SERVICE_PREFIX, aggregatorId)
 }
 
 func GetGlobalAggregatorExternalAddress(aggregatorId string) string {
@@ -160,11 +164,28 @@ func GetGlobalAggregatorExternalAddress(aggregatorId string) string {
 }
 
 func GetGlobalAggregatorConfigMapName(aggregatorId string) string {
-	return fmt.Sprintf("%s-%s", GLOBAL_AGGREGATOR_CONFIG_MAP_NAME, aggregatorId)
+	return fmt.Sprintf("%s-%s", GLOBAL_AGGREGATOR_CONFIG_MAP_PREFIX, aggregatorId)
+}
+
+func GetGlobalAggregatorPersistentVolumeName(aggregatorId string) string {
+	return fmt.Sprintf("%s-%s", GLOBAL_AGGREGATOR_PERSISTENT_VOLUME_PREFIX, aggregatorId)
+}
+
+func GetGlobalAggregatorPersistentVolumeClaimName(aggregatorId string) string {
+	return fmt.Sprintf("%s-%s", GLOBAL_AGGREGATOR_PERSISTENT_VOLUME_CLAIM_PREFIX, aggregatorId)
+}
+
+
+func GetLocalAggregatorPersistentVolumeName(aggregatorId string) string {
+	return fmt.Sprintf("%s-%s", LOCAL_AGGREGATOR_PERSISTENT_VOLUME_PREFIX, aggregatorId)
+}
+
+func GetLocalAggregatorPersistentVolumeClaimName(aggregatorId string) string {
+	return fmt.Sprintf("%s-%s", LOCAL_AGGREGATOR_PERSISTENT_VOLUME_CLAIM_PREFIX, aggregatorId)
 }
 
 func GetLocalAggregatorServiceName(aggregatorId string) string {
-	return fmt.Sprintf("%s-%s", LOCAL_AGGREGATOR_SERVICE_NAME, aggregatorId)
+	return fmt.Sprintf("%s-%s", LOCAL_AGGREGATOR_SERVICE_PREFIX, aggregatorId)
 }
 
 func GetLocalAggregatorExternalAddress(aggregatorId string) string {
@@ -172,15 +193,24 @@ func GetLocalAggregatorExternalAddress(aggregatorId string) string {
 }
 
 func GetLocalAggregatorConfigMapName(aggregatorId string) string {
-	return fmt.Sprintf("%s-%s", LOCAL_AGGREGATOR_CONFIG_MAP_NAME, aggregatorId)
+	return fmt.Sprintf("%s-%s", LOCAL_AGGREGATOR_CONFIG_MAP_PREFIX, aggregatorId)
 }
 
 func GetLocalAggregatorDeploymentName(aggregatorId string) string {
 	return fmt.Sprintf("%s-%s", LOCAL_AGGRETATOR_DEPLOYMENT_PREFIX, aggregatorId)
 }
 
+
 func GetClientConfigMapName(clientId string) string {
-	return fmt.Sprintf("%s-%s", FL_CLIENT_CONFIG_MAP_NAME, clientId)
+	return fmt.Sprintf("%s-%s", FL_CLIENT_CONFIG_MAP_PREFIX, clientId)
+}
+
+func GetClientPersistentVolumeName(clientId string) string {
+	return fmt.Sprintf("%s-%s", FL_CLIENT_PERSISTENT_VOLUME_PREFIX, clientId)
+}
+
+func GetClientPersistentVolumeClaimName(clientId string) string {
+	return fmt.Sprintf("%s-%s", FL_CLIENT_PERSISTENT_VOLUME_CLAIM_PREFIX, clientId)
 }
 
 func GetClientDeploymentName(clientId string) string {
