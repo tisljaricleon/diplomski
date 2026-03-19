@@ -8,8 +8,11 @@ curl -X POST http://10.19.4.45:8080/fl/start \
       "learningRate": 0.01
     },
     "modelSize": 123.0,
-    "costSource": "",
-    "costConfiguration": {},
+    "costSource": "communication",
+    "costConfiguration": {
+      "costType": "totalBudget",
+      "communicationBudget": 100000
+    },
     "configurationModel": "minKld",
     "rvaEnabled": false
   }'
