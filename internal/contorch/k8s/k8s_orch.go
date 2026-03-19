@@ -574,10 +574,10 @@ func getHostIp(node corev1.Node) string {
 	return ""
 }
 
-func (orch *K8sOrchestrator) GetGlobalAggregatorLogs() (bytes.Buffer, error) {
+func (orch *K8sOrchestrator) GetGlobalAggregatorLogs(aggregatorId string) (bytes.Buffer, error) {
 	// Get the deployment
 	deployment, err := orch.clientset.AppsV1().Deployments(orch.namespace).Get(context.TODO(),
-		common.GetGlobalAggregatorDeploymentName(aggregator.Id), metav1.GetOptions{})
+		common.GetGlobalAggregatorDeploymentName(aggregatorId), metav1.GetOptions{})
 	if err != nil {
 		return bytes.Buffer{}, fmt.Errorf("error retrieving deployment: %v", err)
 	}

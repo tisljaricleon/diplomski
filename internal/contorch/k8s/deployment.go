@@ -88,7 +88,7 @@ func BuildGlobalAggregatorDeployment(aggregator *model.FlAggregator, namespace s
 							Name: "modelstorage",
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: common.GetGlobalAggregatorPVCName(aggregator.Id),
+									ClaimName: common.GetGlobalAggregatorPersistentVolumeClaimName(aggregator.Id),
 								},
 							},
 						},
@@ -168,7 +168,7 @@ func BuildLocalAggregatorDeployment(aggregator *model.FlAggregator, namespace st
 							Name: "modelstorage",
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: common.GetLocalAggregatorPVCName(aggregator.Id),
+									ClaimName: common.GetLocalAggregatorPersistentVolumeClaimName(aggregator.Id),
 								},
 							},
 						},
@@ -253,7 +253,7 @@ func BuildClientDeployment(client *model.FlClient, namespace string) *appsv1.Dep
 							Name: "modelstorage",
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: common.GetClientPVCName(client.Id),
+									ClaimName: common.GetClientPersistentVolumeClaimName(client.Id),
 								},
 							},
 						},

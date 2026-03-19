@@ -64,7 +64,7 @@ func (orch *DummyOrch) CreateGlobalAggregator(aggregator *model.FlAggregator, co
 	return nil
 }
 
-func (orch *DummyOrch) GetGlobalAggregatorLogs() (bytes.Buffer, error) {
+func (orch *DummyOrch) GetGlobalAggregatorLogs(aggregatorId string) (bytes.Buffer, error) {
 	return bytes.Buffer{}, nil
 }
 

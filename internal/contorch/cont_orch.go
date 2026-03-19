@@ -11,7 +11,7 @@ type IContainerOrchestrator interface {
 	StartNodeStateChangeNotifier()
 	StopAllNotifiers()
 	CreateGlobalAggregator(aggregator *model.FlAggregator, configFiles map[string]string) error
-	GetGlobalAggregatorLogs() (bytes.Buffer, error)
+	GetGlobalAggregatorLogs(aggregatorId string) (bytes.Buffer, error)
 	RemoveGlobalAggregator(aggregator *model.FlAggregator) error
 	CreateLocalAggregator(aggregator *model.FlAggregator, configFiles map[string]string) error
 	RemoveLocalAggregator(aggregator *model.FlAggregator) error

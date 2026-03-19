@@ -393,7 +393,7 @@ func (orch *FlOrchestrator) runReconfigurationModel() {
 
 func (orch *FlOrchestrator) monitorFlProgress() {
 	for {
-		logsBuffer, err := orch.contOrch.GetGlobalAggregatorLogs()
+	logsBuffer, err := orch.contOrch.GetGlobalAggregatorLogs(orch.configuration.GlobalAggregator.Id)
 		if err != nil {
 			orch.logger.Error(fmt.Sprintf("Error while obtaining GA logs: %s", err.Error()))
 			time.Sleep(1 * time.Second)

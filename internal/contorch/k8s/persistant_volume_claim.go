@@ -5,12 +5,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"github.com/AIoTwin-Adaptive-FL-Orch/fl-orchestrator/internal/common"
 )
 
 func BuildGlobalAggregatorPVC(id string, namespace string) *corev1.PersistentVolumeClaim {
        return &corev1.PersistentVolumeClaim{
 	       ObjectMeta: metav1.ObjectMeta{
-		       Name:      common.GetGlobalAggregatorPVCName(id),
+		       Name:      common.GetGlobalAggregatorPersistentVolumeClaimName(id),
 		       Namespace: namespace,
 	       },
 	       Spec: corev1.PersistentVolumeClaimSpec{
@@ -30,7 +31,7 @@ func BuildGlobalAggregatorPVC(id string, namespace string) *corev1.PersistentVol
 func BuildLocalAggregatorPVC(id string, namespace string) *corev1.PersistentVolumeClaim {
        return &corev1.PersistentVolumeClaim{
 	       ObjectMeta: metav1.ObjectMeta{
-		       Name:      common.GetLocalAggregatorPVCName(id),
+		       Name:      common.GetLocalAggregatorPersistentVolumeClaimName(id),
 		       Namespace: namespace,
 	       },
 	       Spec: corev1.PersistentVolumeClaimSpec{
@@ -50,7 +51,7 @@ func BuildLocalAggregatorPVC(id string, namespace string) *corev1.PersistentVolu
 func BuildClientPVC(id string, namespace string) *corev1.PersistentVolumeClaim {
        return &corev1.PersistentVolumeClaim{
 	       ObjectMeta: metav1.ObjectMeta{
-		       Name:      common.GetClientPVCName(id),
+		       Name:      common.GetClientPersistentVolumeClaimName(id),
 		       Namespace: namespace,
 	       },
 	       Spec: corev1.PersistentVolumeClaimSpec{
