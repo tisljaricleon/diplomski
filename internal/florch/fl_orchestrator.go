@@ -355,6 +355,14 @@ func (orch *FlOrchestrator) deployFlClientServing(client *model.FlClient) error 
 	return nil
 }
 
+func (orch *FlOrchestrator) RemoveFlClientServing(client *model.FlClient) {
+    orch.contOrch.RemoveFlClientServing(client)
+}
+
+func (orch *FlOrchestrator) RemoveGlobalAggregatorServing(aggregator *model.FlAggregator) {
+    orch.contOrch.RemoveGlobalAggregatorServing(aggregator)
+}
+
 func (orch *FlOrchestrator) flFinishedHandler(eventChan <-chan events.Event) {
 	for event := range eventChan {
 		flFinishedEvent, ok := event.Data.(events.FlFinishedEvent)

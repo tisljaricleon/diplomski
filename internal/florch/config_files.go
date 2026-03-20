@@ -75,7 +75,6 @@ func BuildClientConfigFiles(client *model.FlClient) (map[string]string, error) {
 }
 
 func BuildGlobalAggregatorServingConfigFiles() (map[string]string, error) {
-	configDirectoryPath := "../../configs/fl/"
 	buildImagesPath := "../../internal/build_images/global_server_serving/"
 
 	servingpyBytesArray, err := os.ReadFile(fmt.Sprint(buildImagesPath, "serving.py"))
@@ -95,7 +94,6 @@ func BuildGlobalAggregatorServingConfigFiles() (map[string]string, error) {
 }
 
 func BuildLocalAggregatorServingConfigFiles() (map[string]string, error) {
-	configDirectoryPath := "../../configs/fl/"
 	buildImagesPath := "../../internal/build_images/local_server_serving/"
 
 	servingpyBytesArray, err := os.ReadFile(fmt.Sprint(buildImagesPath, "serving.py"))
@@ -115,7 +113,6 @@ func BuildLocalAggregatorServingConfigFiles() (map[string]string, error) {
 }
 
 func BuildClientServingConfigFiles() (map[string]string, error) {
-	configDirectoryPath := "../../configs/fl/"
 	buildImagesPath := "../../internal/build_images/client_serving/"
 
 	servingpyBytesArray, err := os.ReadFile(fmt.Sprint(buildImagesPath, "serving.py"))

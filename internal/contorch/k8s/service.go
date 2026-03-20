@@ -44,7 +44,7 @@ func BuildGlobalAggregatorServingService(flAggregator *model.FlAggregator) *core
 		       Ports: []corev1.ServicePort{
 			       {
 				       Port: common.GLOBAL_AGGREGATOR_SERVING_PORT,
-				       TargetPort: intstrFromInt(common.GLOBAL_AGGREGATOR_SERVING_PORT),
+				       TargetPort: intstr.FromInt(common.GLOBAL_AGGREGATOR_SERVING_PORT),
 				       NodePort: common.GLOBAL_AGGREGATOR_SERVING_NODE_PORT,
 			       },
 		       },
@@ -75,20 +75,20 @@ func BuildLocalAggregatorService(flAggregator *model.FlAggregator) *corev1.Servi
 	return service
 }
 
-func BuildClientServingService(flAggregator *model.FlAggregator) *corev1.Service {
+func BuildClientServingService(flClient *model.FlClient) *corev1.Service {
 	service := &corev1.Service{
 	       ObjectMeta: metav1.ObjectMeta{
-		       Name: common.GetClientServingServiceName(flAggregator.Id),
+		       Name: common.GetClientServingServiceName(flClient.Id),
 	       },
 	       Spec: corev1.ServiceSpec{
 		       Type: corev1.ServiceTypeNodePort,
 		       Selector: map[string]string{
-			       "fl": fmt.Sprintf("serving-%s", flAggregator.Id),
+			       "fl": fmt.Sprintf("serving-%s", flClient.Id),
 		       },
 		       Ports: []corev1.ServicePort{
 			       {
 				       Port: common.FL_CLIENT_SERVING_PORT,
-				       TargetPort: intstrFromInt(common.FL_CLIENT_SERVING_PORT),
+				       TargetPort: intstr.FromInt(common.FL_CLIENT_SERVING_PORT),
 				       NodePort: common.FL_CLIENT_SERVING_NODE_PORT,
 			       },
 		       },
