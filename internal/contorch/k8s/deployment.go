@@ -346,7 +346,7 @@ func BuildGlobalAggregatorServingDeployment(aggregator *model.FlAggregator, name
 	return deployment
 }
 
-func BuildClientServingDeployment(client *model.Client, namespace string) *appsv1.Deployment {
+func BuildClientServingDeployment(client *model.FlClient, namespace string) *appsv1.Deployment {
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      common.GetClientServingDeploymentName(client.Id),

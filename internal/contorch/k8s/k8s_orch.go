@@ -404,7 +404,7 @@ func (orch *K8sOrchestrator) RemoveClient(client *model.FlClient) error {
 	return nil
 }
 
-func (orch *K8sOrchestrator) CreateClientServing(client *model.Client, configFiles map[string]string) error {
+func (orch *K8sOrchestrator) CreateClientServing(client *model.FlClient, configFiles map[string]string) error {
 	err := orch.createConfigMapFromFiles(common.GetClientServingConfigMapName(client.Id), configFiles)
 	if err != nil {
 		return err
@@ -431,7 +431,7 @@ func (orch *K8sOrchestrator) CreateClientServing(client *model.Client, configFil
 	return nil
 }
 
-func (orch *K8sOrchestrator) RemoveClientServing(client *model.Client) error {
+func (orch *K8sOrchestrator) RemoveClientServing(client *model.FlClient) error {
 	err := orch.deleteService(common.GetClientServingServiceName(client.Id))
 	if err != nil {
 		return err

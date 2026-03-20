@@ -7,6 +7,7 @@ import (
 	"github.com/AIoTwin-Adaptive-FL-Orch/fl-orchestrator/internal/model"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	intstr "k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func BuildGlobalAggregatorService(flAggregator *model.FlAggregator) *corev1.Service {
