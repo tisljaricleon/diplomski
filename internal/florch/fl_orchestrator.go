@@ -169,9 +169,9 @@ func (orch *FlOrchestrator) deployFl() {
 
 	for _, localAggregator := range orch.configuration.LocalAggregators {
 		orch.deployLocalAggregator(localAggregator)
-		if orch.enableServing {
+		/*if orch.enableServing {
 			orch.deployLocalAggregatorServing(localAggregator)
-		}
+		}*/
 		time.Sleep(1 * time.Second)
 	}
 	time.Sleep(60 * time.Second)
