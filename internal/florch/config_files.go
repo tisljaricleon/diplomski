@@ -74,6 +74,67 @@ func BuildClientConfigFiles(client *model.FlClient) (map[string]string, error) {
 	return filesData, nil
 }
 
+func BuildGlobalAggregatorServingConfigFiles() (map[string]string, error) {
+	configDirectoryPath := "../../configs/fl/"
+	buildImagesPath := "../../internal/build_images/global_server_serving/"
+
+	servingpyBytesArray, err := os.ReadFile(fmt.Sprint(buildImagesPath, "serving.py"))
+	if err != nil {
+		fmt.Print(err)
+	}
+	servingpyString := string(servingpyBytesArray)
+
+	globalAggregatorServingConfig := GlobalAggregatorServingConfig_Yaml
+
+	filesData := map[string]string{
+		"global_server_serving.py":         servingpyString,
+		"global_server_serving_config.yaml": globalAggregatorServingConfig,
+	}
+
+	return filesData, nil
+}
+
+func BuildLocalAggregatorServingConfigFiles() (map[string]string, error) {
+	configDirectoryPath := "../../configs/fl/"
+	buildImagesPath := "../../internal/build_images/local_server_serving/"
+
+	servingpyBytesArray, err := os.ReadFile(fmt.Sprint(buildImagesPath, "serving.py"))
+	if err != nil {
+		fmt.Print(err)
+	}
+	servingpyString := string(servingpyBytesArray)
+
+	localAggregatorServingConfig := LocalAggregatorServingConfig_Yaml
+
+	filesData := map[string]string{
+		"local_server_serving.py":         servingpyString,
+		"local_server_serving_config.yaml": localAggregatorServingConfig,
+	}
+
+	return filesData, nil
+}
+
+func BuildClientServingConfigFiles() (map[string]string, error) {
+	configDirectoryPath := "../../configs/fl/"
+	buildImagesPath := "../../internal/build_images/client_serving/"
+
+	servingpyBytesArray, err := os.ReadFile(fmt.Sprint(buildImagesPath, "serving.py"))
+	if err != nil {
+		fmt.Print(err)
+	}
+	servingpyString := string(servingpyBytesArray)
+
+	clientServingConfig := ClientServingConfig_Yaml
+
+	filesData := map[string]string{
+		"client_serving.py":         servingpyString,
+		"client_serving_config.yaml": clientServingConfig,
+	}
+
+	return filesData, nil
+}
+
+
 const GlobalAggregatorConfig_Yaml = `
 server:
   address: "0.0.0.0:8080"
@@ -114,4 +175,25 @@ run_config:
   local-epochs: %[4]s 
   batch-size: %[5]s 
   learning-rate: %[6]s  
+`
+
+const GlobalAggregatorServingConfig_Yaml = `
+server:
+  address: "0.0.0.0:8000"
+model:
+  name: "model.pt"
+`
+
+const LocalAggregatorServingConfig_Yaml = `
+server:
+  address: "0.0.0.0:8000"
+model:
+  name: "model.pt"
+`
+
+const ClientServingConfig_Yaml = `
+server:
+  address: "0.0.0.0:8000"
+model:
+  name: "model.pt"
 `

@@ -26,6 +26,7 @@ type StartFlRequest struct {
 	CostConfiguration  cost.CostConfiguration `json:"costConfiguration" `
 	ConfigurationModel string                 `json:"configurationModel"`
 	RvaEnabled         bool                   `json:"rvaEnabled"`
+    EnableServing      bool                   `json:"enableServing"`
 }
 
 type TrainingParams struct {

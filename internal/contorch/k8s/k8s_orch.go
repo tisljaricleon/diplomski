@@ -229,6 +229,52 @@ func (orch *K8sOrchestrator) RemoveGlobalAggregator(aggregator *model.FlAggregat
 	return nil
 }
 
+func (orch *K8sOrchestrator) CreateGlobalAggregatorServing(aggregator *model.FlAggregator, configFiles map[string]string) error {
+	err := orch.createConfigMapFromFiles(common.GetGlobalAggregatorServingConfigMapName(aggregator.Id), configFiles)
+	if err != nil {
+		return err
+	}
+
+	deployment := BuildGlobalAggregatorServingDeployment(aggregator, orch.namespace)
+	if !orch.simulation {
+		deployment.Spec.Template.Spec.NodeName = aggregator.Id
+	} else {
+		deployment.Spec.Template.Spec.NodeName = orch.simulationNodes[orch.lastSimulationNode]
+		orch.lastSimulationNode++
+	}
+	err = orch.createDeployment(deployment)
+	if err != nil {
+		return err
+	}
+
+	service := BuildGlobalAggregatorServingService(aggregator)
+	err = orch.createService(service)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (orch *K8sOrchestrator) RemoveGlobalAggregatorServing(aggregator *model.FlAggregator) error {
+	err := orch.deleteService(common.GetGlobalAggregatorServingServiceName(aggregator.Id))
+	if err != nil {
+		return err
+	}
+
+	err = orch.deleteDeployment(common.GetGlobalAggregatorServingDeploymentName(aggregator.Id))
+	if err != nil {
+		return err
+	}
+
+	err = orch.deleteConfigMap(common.GetGlobalAggregatorServingConfigMapName(aggregator.Id))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (orch *K8sOrchestrator) CreateLocalAggregator(aggregator *model.FlAggregator, configFiles map[string]string) error {
 	err := orch.createConfigMapFromFiles(common.GetLocalAggregatorConfigMapName(aggregator.Id), configFiles)
 	if err != nil {
@@ -351,6 +397,52 @@ func (orch *K8sOrchestrator) RemoveClient(client *model.FlClient) error {
 	}
 
 	err = orch.deletePersistentVolume(common.GetClientPersistentVolumeName(client.Id))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (orch *K8sOrchestrator) CreateClientServing(client *model.Client, configFiles map[string]string) error {
+	err := orch.createConfigMapFromFiles(common.GetClientServingConfigMapName(client.Id), configFiles)
+	if err != nil {
+		return err
+	}
+
+	deployment := BuildClientServingDeployment(client, orch.namespace)
+	if !orch.simulation {
+		deployment.Spec.Template.Spec.NodeName = client.Id
+	} else {
+		deployment.Spec.Template.Spec.NodeName = orch.simulationNodes[orch.lastSimulationNode]
+		orch.lastSimulationNode++
+	}
+	err = orch.createDeployment(deployment)
+	if err != nil {
+		return err
+	}
+
+	service := BuildClientServingService(client)
+	err = orch.createService(service)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (orch *K8sOrchestrator) RemoveClientServing(client *model.Client) error {
+	err := orch.deleteService(common.GetClientServingServiceName(client.Id))
+	if err != nil {
+		return err
+	}
+
+	err = orch.deleteDeployment(common.GetClientServingDeploymentName(client.Id))
+	if err != nil {
+		return err
+	}
+
+	err = orch.deleteConfigMap(common.GetClientServingConfigMapName(client.Id))
 	if err != nil {
 		return err
 	}

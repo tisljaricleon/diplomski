@@ -39,6 +39,7 @@ type FlOrchestrator struct {
 	progress                 *FlProgress
 	reconfigurationEvaluator *ReconfigurationEvaluator
 	rvaEnabled               bool
+	enableServing            bool
 }
 
 type FlProgress struct {
@@ -54,7 +55,7 @@ var rememberRemovedClientsIDS []int
 
 func NewFlOrchestrator(contOrch contorch.IContainerOrchestrator, eventBus *events.EventBus, logger hclog.Logger,
 	configurationModelName string, epochs int32, localRounds int32, batchSize int32, learningRate float32,
-	modelSize float32, costSource cost.CostSource, costConfiguration *cost.CostConfiguration, rvaEnabled bool) (*FlOrchestrator, error) {
+	modelSize float32, costSource cost.CostSource, costConfiguration *cost.CostConfiguration, rvaEnabled bool, enableServing bool) (*FlOrchestrator, error) {
 	orch := &FlOrchestrator{
 		contOrch:                 contOrch,
 		eventBus:                 eventBus,
@@ -65,6 +66,7 @@ func NewFlOrchestrator(contOrch contorch.IContainerOrchestrator, eventBus *event
 		costConfiguration:        costConfiguration,
 		costSource:               costSource,
 		rvaEnabled:               rvaEnabled,
+		enableServing:            enableServing,
 		reconfigurationEvaluator: &ReconfigurationEvaluator{isActive: false},
 	}
 
@@ -160,10 +162,16 @@ func (orch *FlOrchestrator) Stop() {
 
 func (orch *FlOrchestrator) deployFl() {
 	orch.deployGlobalAggregator(orch.configuration.GlobalAggregator)
+	/*if orch.enableServing {
+		orch.deployGlobalAggregatorServing(orch.configuration.GlobalAggregator)
+	}*/
 	time.Sleep(100 * time.Second)
 
 	for _, localAggregator := range orch.configuration.LocalAggregators {
 		orch.deployLocalAggregator(localAggregator)
+		if orch.enableServing {
+			orch.deployLocalAggregatorServing(localAggregator)
+		}
 		time.Sleep(1 * time.Second)
 	}
 	time.Sleep(60 * time.Second)
@@ -172,6 +180,9 @@ func (orch *FlOrchestrator) deployFl() {
 		client.BatchSize = orch.batchSize
 		client.LearningRate = orch.learningRate
 		orch.deployFlClient(client)
+		if orch.enableServing {
+			orch.deployFlClientServing(client)
+		}
 		time.Sleep(1 * time.Second)
 	}
 }
@@ -179,6 +190,9 @@ func (orch *FlOrchestrator) deployFl() {
 func (orch *FlOrchestrator) removeFl() {
 	for _, client := range orch.configuration.Clients {
 		orch.contOrch.RemoveClient(client)
+		if orch.enableServing {
+			orch.RemoveFlClientServing(client)
+		}
 	}
 
 	for _, localAggregator := range orch.configuration.LocalAggregators {
@@ -186,6 +200,9 @@ func (orch *FlOrchestrator) removeFl() {
 	}
 
 	orch.contOrch.RemoveGlobalAggregator(orch.configuration.GlobalAggregator)
+	if orch.enableServing {
+		orch.RemoveGlobalAggregatorServing(orch.configuration.GlobalAggregator)
+	}
 }
 
 func (orch *FlOrchestrator) reconfigure(newConfiguration *flconfig.FlConfiguration) {
@@ -253,6 +270,23 @@ func (orch *FlOrchestrator) deployGlobalAggregator(flAggregator *model.FlAggrega
 	return nil
 }
 
+func (orch *FlOrchestrator) deployGlobalAggregatorServing(flAggregator *model.FlAggregator) error {
+	globalAggregatorServingConfigData, err := BuildGlobalAggregatorServingConfigFiles()
+	if err != nil {
+		orch.logger.Error(fmt.Sprintf("Error while initializing global aggregator serving config files: %s", err.Error()))
+		return err
+	}
+
+	if err := orch.contOrch.CreateGlobalAggregatorServing(flAggregator, globalAggregatorServingConfigData); err != nil {
+		orch.logger.Error(fmt.Sprintf("Error while deploying global aggregator serving: %s", err.Error()))
+		return err
+	}
+
+	orch.logger.Info("Global aggregator serving deployed!")
+
+	return nil
+}
+
 func (orch *FlOrchestrator) deployLocalAggregator(flAggregator *model.FlAggregator) error {
 	localAggregatorConfigFilesData, err := BuildLocalAggregatorConfigFiles(flAggregator)
 	if err != nil {
@@ -270,6 +304,23 @@ func (orch *FlOrchestrator) deployLocalAggregator(flAggregator *model.FlAggregat
 	return nil
 }
 
+func (orch *FlOrchestrator) deployLocalAggregatorServing(flAggregator *model.FlAggregator) error {
+	localAggregatorServingConfigData, err := BuildLocalAggregatorServingConfigFiles()
+	if err != nil {
+		orch.logger.Error(fmt.Sprintf("Error while initializing local aggregator serving config files: %s", err.Error()))
+		return err
+	}
+
+	if err := orch.contOrch.CreateLocalAggregatorServing(flAggregator, localAggregatorServingConfigData); err != nil {
+		orch.logger.Error(fmt.Sprintf("Error while deploying local aggregator serving: %s", err.Error()))
+		return err
+	}
+
+	orch.logger.Info("Local aggregator serving deployed!")
+
+	return nil
+}
+
 func (orch *FlOrchestrator) deployFlClient(client *model.FlClient) error {
 	clientConfigFilesData, err := BuildClientConfigFiles(client)
 	if err != nil {
@@ -283,6 +334,23 @@ func (orch *FlOrchestrator) deployFlClient(client *model.FlClient) error {
 	}
 
 	orch.logger.Info(fmt.Sprintf("Client %s deployed!", client.Id))
+
+	return nil
+}
+
+func (orch *FlOrchestrator) deployFlClientServing(client *model.FlClient) error {
+	clientServingConfigData, err := BuildClientServingConfigFiles()
+	if err != nil {
+		orch.logger.Error(fmt.Sprintf("Error while initializing client %s serving config files: %s", client.Id, err.Error()))
+		return err
+	}
+
+	if err := orch.contOrch.CreateFlClientServing(client, clientServingConfigData); err != nil {
+		orch.logger.Error(fmt.Sprintf("Error while creating client %s serving deployment: %s", client.Id, err.Error()))
+		return err
+	}
+
+	orch.logger.Info(fmt.Sprintf("Client %s serving deployed!", client.Id))
 
 	return nil
 }

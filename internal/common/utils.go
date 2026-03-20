@@ -175,6 +175,18 @@ func GetGlobalAggregatorPersistentVolumeClaimName(aggregatorId string) string {
 	return fmt.Sprintf("%s-%s", GLOBAL_AGGREGATOR_PERSISTENT_VOLUME_CLAIM_PREFIX, aggregatorId)
 }
 
+func GetGlobalAggregatorServingDeploymentName(aggregatorId string) string {
+	return fmt.Sprintf("%s-%s", GLOBAL_AGGREGATOR_SERVING_DEPLOYMENT_PREFIX, aggregatorId)
+}
+
+func GetGlobalAggregatorServingConfigMapName(aggregatorId string) string {
+	return fmt.Sprintf("%s-%s", GLOBAL_AGGREGATOR_SERVING_CONFIG_MAP_PREFIX, aggregatorId)
+}
+
+func GetGlobalAggregatorServingServiceName(aggregatorId string) string {
+	return fmt.Sprintf("%s-%s", GLOBAL_AGGREGATOR_SERVING_SERVICE_PREFIX, aggregatorId)
+}
+
 
 func GetLocalAggregatorPersistentVolumeName(aggregatorId string) string {
 	return fmt.Sprintf("%s-%s", LOCAL_AGGREGATOR_PERSISTENT_VOLUME_PREFIX, aggregatorId)
@@ -200,6 +212,18 @@ func GetLocalAggregatorDeploymentName(aggregatorId string) string {
 	return fmt.Sprintf("%s-%s", LOCAL_AGGRETATOR_DEPLOYMENT_PREFIX, aggregatorId)
 }
 
+func GetLocalAggregatorServingDeploymentName(aggregatorId string) string {
+	return fmt.Sprintf("%s-%s", LOCAL_AGGREGATOR_SERVING_DEPLOYMENT_PREFIX, aggregatorId)
+}
+
+func GetLocalAggregatorServingConfigMapName(aggregatorId string) string {
+	return fmt.Sprintf("%s-%s", LOCAL_AGGREGATOR_SERVING_CONFIG_MAP_PREFIX, aggregatorId)
+}
+
+func GetLocalAggregatorServingServiceName(aggregatorId string) string {
+	return fmt.Sprintf("%s-%s", LOCAL_AGGREGATOR_SERVING_SERVICE_PREFIX, aggregatorId)
+}
+
 
 func GetClientConfigMapName(clientId string) string {
 	return fmt.Sprintf("%s-%s", FL_CLIENT_CONFIG_MAP_PREFIX, clientId)
@@ -216,6 +240,19 @@ func GetClientPersistentVolumeClaimName(clientId string) string {
 func GetClientDeploymentName(clientId string) string {
 	return fmt.Sprintf("%s-%s", FL_CLIENT_DEPLOYMENT_PREFIX, clientId)
 }
+
+func GetClientServingDeploymentName(clientId string) string {
+	return fmt.Sprintf("%s-%s", FL_CLIENT_SERVING_DEPLOYMENT_PREFIX, clientId)
+}
+
+func GetClientServingConfigMapName(clientId string) string {
+	return fmt.Sprintf("%s-%s", FL_CLIENT_SERVING_CONFIG_MAP_PREFIX, clientId)
+}
+
+func GetClientServingServiceName(clientId string) string {
+	return fmt.Sprintf("%s-%s", FL_CLIENT_SERVING_SERVICE_PREFIX, clientId)
+}
+
 
 func CalculateAverageFloat64(numbers []float64) float64 {
 	if len(numbers) == 0 {

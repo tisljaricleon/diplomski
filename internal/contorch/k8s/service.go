@@ -30,6 +30,29 @@ func BuildGlobalAggregatorService(flAggregator *model.FlAggregator) *corev1.Serv
 	return service
 }
 
+func BuildGlobalAggregatorServingService(flAggregator *model.FlAggregator) *corev1.Service {
+	service := &corev1.Service{
+	       ObjectMeta: metav1.ObjectMeta{
+		       Name: common.GetGlobalAggregatorServingServiceName(flAggregator.Id),
+	       },
+	       Spec: corev1.ServiceSpec{
+		       Type: corev1.ServiceTypeNodePort,
+		       Selector: map[string]string{
+			       "fl": fmt.Sprintf("serving-%s", flAggregator.Id),
+		       },
+		       Ports: []corev1.ServicePort{
+			       {
+				       Port: common.GLOBAL_AGGREGATOR_SERVING_PORT,
+				       TargetPort: intstrFromInt(common.GLOBAL_AGGREGATOR_SERVING_PORT),
+				       NodePort: common.GLOBAL_AGGREGATOR_SERVING_NODE_PORT,
+			       },
+		       },
+	       },
+	}
+
+	return service
+}
+
 func BuildLocalAggregatorService(flAggregator *model.FlAggregator) *corev1.Service {
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -46,6 +69,29 @@ func BuildLocalAggregatorService(flAggregator *model.FlAggregator) *corev1.Servi
 				},
 			},
 		},
+	}
+
+	return service
+}
+
+func BuildClientServingService(flAggregator *model.FlAggregator) *corev1.Service {
+	service := &corev1.Service{
+	       ObjectMeta: metav1.ObjectMeta{
+		       Name: common.GetClientServingServiceName(flAggregator.Id),
+	       },
+	       Spec: corev1.ServiceSpec{
+		       Type: corev1.ServiceTypeNodePort,
+		       Selector: map[string]string{
+			       "fl": fmt.Sprintf("serving-%s", flAggregator.Id),
+		       },
+		       Ports: []corev1.ServicePort{
+			       {
+				       Port: common.FL_CLIENT_SERVING_PORT,
+				       TargetPort: intstrFromInt(common.FL_CLIENT_SERVING_PORT),
+				       NodePort: common.FL_CLIENT_SERVING_NODE_PORT,
+			       },
+		       },
+	       },
 	}
 
 	return service
