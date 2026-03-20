@@ -15,6 +15,8 @@ def get_model_path():
 
 def load_model():
     model_path = get_model_path()
+    if not os.path.exists(model_path):
+        return None
     model = torch.load(model_path, map_location=torch.device('cpu'))
     model.eval()
     return model
@@ -29,6 +31,8 @@ cifar10_transform = transforms.Compose([
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
+    if model is None:
+        return JSONResponse({"prediction": None, "error": "Model not found"}, status_code=200)
     try:
         image = Image.open(io.BytesIO(await file.read())).convert("RGB")
         tensor = cifar10_transform(image).unsqueeze(0)

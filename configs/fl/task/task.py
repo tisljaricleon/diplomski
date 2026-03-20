@@ -66,6 +66,7 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int, num_worke
     ])
 
     full_dataset = CIFAR10(root="./dataset", train=True, download=True, transform=transform)
+    full_dataset = Subset(full_dataset, range(1000))
     total_size = len(full_dataset)
 
     partition_size = total_size // num_partitions
