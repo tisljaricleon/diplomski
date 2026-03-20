@@ -43,11 +43,11 @@ func BuildGlobalAggregatorServingService(flAggregator *model.FlAggregator) *core
 			       "fl": fmt.Sprintf("serving-%s", flAggregator.Id),
 		       },
 		       Ports: []corev1.ServicePort{
-			       {
-				       Port: common.GLOBAL_AGGREGATOR_SERVING_PORT,
-				       TargetPort: intstr.FromInt(common.GLOBAL_AGGREGATOR_SERVING_PORT),
-				       NodePort: basePort,
-			       },
+					{
+						Port: common.GLOBAL_AGGREGATOR_SERVING_PORT,
+						TargetPort: intstr.FromInt(common.GLOBAL_AGGREGATOR_SERVING_PORT),
+						NodePort: int32(basePort),
+					},
 		       },
 	       },
 	}
