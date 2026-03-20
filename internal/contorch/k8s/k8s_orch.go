@@ -380,7 +380,7 @@ func (orch *K8sOrchestrator) CreateFlClient(client *model.FlClient, configFiles 
 	return nil
 }
 
-func (orch *K8sOrchestrator) RemoveClient(client *model.FlClient) error {
+func (orch *K8sOrchestrator) RemoveFlClient(client *model.FlClient) error {
 	err := orch.deleteDeployment(common.GetClientDeploymentName(client.Id))
 	if err != nil {
 		return err

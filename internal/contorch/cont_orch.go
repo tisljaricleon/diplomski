@@ -21,6 +21,6 @@ type IContainerOrchestrator interface {
 	CreateFlClientServing(client *model.FlClient, configFiles map[string]string) error
 	RemoveFlClient(client *model.FlClient) error
 	RemoveFlClientServing(client *model.FlClient) error
-	RemoveClient(client *model.FlClient) error
+	//RemoveClient(client *model.FlClient) error
 	GetClientLogs(clientId string) (bytes.Buffer, error)
 }
