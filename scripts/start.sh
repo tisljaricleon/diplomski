@@ -14,5 +14,6 @@ curl -X POST http://10.19.4.45:8080/fl/start \
       "communicationBudget": 100000
     },
     "configurationModel": "minKld",
-    "rvaEnabled": false
+    "rvaEnabled": false,
+    "enableServing": true
   }'
