@@ -32,6 +32,14 @@ func BuildGlobalAggregatorService(flAggregator *model.FlAggregator) *corev1.Serv
 }
 
 func BuildGlobalAggregatorServingService(flAggregator *model.FlAggregator) *corev1.Service {
+	basePort := common.GLOBAL_AGGREGATOR_SERVING_NODE_PORT 
+    var idNum int
+    n, err := fmt.Sscanf(flAggregator.Id, "n%d", &idNum)
+    if err != nil || n != 1 {
+        idNum = 0
+    }
+    nodePort := int32(basePort + idNum)
+
 	service := &corev1.Service{
 	       ObjectMeta: metav1.ObjectMeta{
 		       Name: common.GetGlobalAggregatorServingServiceName(flAggregator.Id),
@@ -45,7 +53,7 @@ func BuildGlobalAggregatorServingService(flAggregator *model.FlAggregator) *core
 			       {
 				       Port: common.GLOBAL_AGGREGATOR_SERVING_PORT,
 				       TargetPort: intstr.FromInt(common.GLOBAL_AGGREGATOR_SERVING_PORT),
-				       NodePort: common.GLOBAL_AGGREGATOR_SERVING_NODE_PORT,
+				       NodePort: nodePort,
 			       },
 		       },
 	       },
@@ -76,6 +84,14 @@ func BuildLocalAggregatorService(flAggregator *model.FlAggregator) *corev1.Servi
 }
 
 func BuildClientServingService(flClient *model.FlClient) *corev1.Service {
+	basePort := common.FL_CLIENT_SERVING_NODE_PORT 
+    var idNum int
+    n, err := fmt.Sscanf(flClient.Id, "n%d", &idNum)
+    if err != nil || n != 1 {
+        idNum = 0
+    }
+    nodePort := int32(basePort + idNum)
+
 	service := &corev1.Service{
 	       ObjectMeta: metav1.ObjectMeta{
 		       Name: common.GetClientServingServiceName(flClient.Id),
@@ -89,7 +105,7 @@ func BuildClientServingService(flClient *model.FlClient) *corev1.Service {
 			       {
 				       Port: common.FL_CLIENT_SERVING_PORT,
 				       TargetPort: intstr.FromInt(common.FL_CLIENT_SERVING_PORT),
-				       NodePort: common.FL_CLIENT_SERVING_NODE_PORT,
+				       NodePort: nodePort,
 			       },
 		       },
 	       },
