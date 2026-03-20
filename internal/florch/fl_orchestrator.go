@@ -304,6 +304,7 @@ func (orch *FlOrchestrator) deployLocalAggregator(flAggregator *model.FlAggregat
 	return nil
 }
 
+/*
 func (orch *FlOrchestrator) deployLocalAggregatorServing(flAggregator *model.FlAggregator) error {
 	localAggregatorServingConfigData, err := BuildLocalAggregatorServingConfigFiles()
 	if err != nil {
@@ -319,7 +320,7 @@ func (orch *FlOrchestrator) deployLocalAggregatorServing(flAggregator *model.FlA
 	orch.logger.Info("Local aggregator serving deployed!")
 
 	return nil
-}
+}*/
 
 func (orch *FlOrchestrator) deployFlClient(client *model.FlClient) error {
 	clientConfigFilesData, err := BuildClientConfigFiles(client)
