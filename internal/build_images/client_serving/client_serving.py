@@ -13,15 +13,18 @@ app = FastAPI()
 def get_model_path():
     return f"/home/model/model.pt"
 
+
 def load_model():
     model_path = get_model_path()
     if not os.path.exists(model_path):
         return None
-    model = torch.load(model_path, map_location=torch.device('cpu'))
-    model.eval()
-    return model
-
-model = load_model()
+    try:
+        model = torch.load(model_path, map_location=torch.device('cpu'))
+        model.eval()
+        return model
+    except Exception as e:
+        print(f"[MODEL LOAD ERROR] {e}")
+        return None
 
 cifar10_transform = transforms.Compose([
     transforms.Resize((32, 32)),
@@ -31,6 +34,7 @@ cifar10_transform = transforms.Compose([
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
+    model = load_model()
     if model is None:
         return JSONResponse({"prediction": None, "error": "Model not found"}, status_code=200)
     try:

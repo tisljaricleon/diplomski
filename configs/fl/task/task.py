@@ -66,7 +66,7 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int, num_worke
     ])
 
     full_dataset = CIFAR10(root="./dataset", train=True, download=True, transform=transform)
-    full_dataset = Subset(full_dataset, range(1000))
+    full_dataset = Subset(full_dataset, range(10000))
     total_size = len(full_dataset)
 
     partition_size = total_size // num_partitions
@@ -96,8 +96,7 @@ def train(net, trainloader, valloader, epochs, learning_rate, device):
     net.train()
     for _ in range(epochs):
         for batch in trainloader:
-            images = batch["img"]
-            labels = batch["label"]
+            images, labels = batch
             optimizer.zero_grad()
             criterion(net(images.to(device)), labels.to(device)).backward()
             optimizer.step()
@@ -118,8 +117,9 @@ def test(net, testloader, device):
     correct, loss = 0, 0.0
     with torch.no_grad():
         for batch in testloader:
-            images = batch["img"].to(device)
-            labels = batch["label"].to(device)
+            images, labels = batch
+            images = images.to(device)
+            labels = labels.to(device)
             outputs = net(images)
             loss += criterion(outputs, labels).item()
             correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
