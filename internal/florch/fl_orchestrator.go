@@ -189,7 +189,7 @@ func (orch *FlOrchestrator) deployFl() {
 
 func (orch *FlOrchestrator) removeFl() {
 	for _, client := range orch.configuration.Clients {
-		orch.contOrch.RemoveClient(client)
+		orch.contOrch.RemoveFlClient(client)
 		if orch.enableServing {
 			orch.RemoveFlClientServing(client)
 		}
@@ -221,10 +221,10 @@ func (orch *FlOrchestrator) reconfigure(newConfiguration *flconfig.FlConfigurati
 		}
 		newClient := common.GetClientInArray(newConfiguration.Clients, oldClient.Id)
 		if (newClient == &model.FlClient{}) {
-			orch.contOrch.RemoveClient(oldClient)
+			orch.contOrch.RemoveFlClient(oldClient)
 			orch.logger.Info(fmt.Sprintf("Removed client: %s", oldClient.Id))
 		} else if oldClient.ParentNodeId != newClient.ParentNodeId {
-			orch.contOrch.RemoveClient(oldClient)
+			orch.contOrch.RemoveFlClient(oldClient)
 			orch.logger.Info(fmt.Sprintf("Client changing cluster: %s", oldClient.Id))
 		}
 	}
@@ -588,8 +588,8 @@ func (orch *FlOrchestrator) monitorFlProgress() {
 						newFlClients = append(newFlClients, client)
 					}
 
-					orch.contOrch.RemoveClient(removeFlClients[0])
-					orch.contOrch.RemoveClient(removeFlClients[1])
+					orch.contOrch.RemoveFlClient(removeFlClients[0])
+					orch.contOrch.RemoveFlClient(removeFlClients[1])
 
 					orch.configuration.Clients = newFlClients
 
