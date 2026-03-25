@@ -76,3 +76,10 @@ if __name__ == "__main__":
 
     client = FlowerClient(trainloader, valloader, local_epochs, learning_rate, partition_id).to_client()
     fl.client.start_numpy_client(server_address=server_address, client=client)
+
+
+
+    #ne trenira se nista -> salje se request na inference, razliciti request rateovi, prati latency, zauzetost gpu (duzi period request rateova)
+
+
+

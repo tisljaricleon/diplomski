@@ -7,7 +7,7 @@ curl -X POST http://10.19.4.45:8080/fl/start \
       "batchSize": 32,
       "learningRate": 0.01
     },
-    "modelSize": 123.0,
+    "modelSize": 10.0,
     "costSource": "communication",
     "costConfiguration": {
       "costType": "totalBudget",
