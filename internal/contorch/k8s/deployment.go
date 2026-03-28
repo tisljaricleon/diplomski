@@ -373,18 +373,22 @@ func BuildClientServingDeployment(client *model.FlClient, namespace string) *app
 								{ ContainerPort: common.FL_CLIENT_SERVING_PORT },
 								
 							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "servingconfig",
-									MountPath: "/home/client_serving_config.yaml",
-									SubPath:   "client_serving_config.yaml",
-								},
-								{
-									Name:      "modelstorage",
-									MountPath: "/home/model",
-								},
-								
-							},
+							   VolumeMounts: []corev1.VolumeMount{
+								   {
+									   Name:      "servingconfig",
+									   MountPath: "/home/client_serving.py",
+									   SubPath:   "client_serving.py",
+								   },
+								   {
+									   Name:      "servingconfig",
+									   MountPath: "/home/client_serving_config.yaml",
+									   SubPath:   "client_serving_config.yaml",
+								   },
+								   {
+									   Name:      "modelstorage",
+									   MountPath: "/home/model",
+								   },
+							   },
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
 									corev1.ResourceCPU:    resource.MustParse("0.2"),
