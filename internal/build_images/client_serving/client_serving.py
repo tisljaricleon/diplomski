@@ -74,7 +74,7 @@ async def predict(file: UploadFile = File(...)):
 
 
 if __name__ == "__main__":
-    with open("global_server_serving_config.yaml", "r") as f:
+    with open("client_server_serving_config.yaml", "r") as f:
         config = yaml.safe_load(f)
 
     address = config.get("server", {}).get("address", "0.0.0.0:8000")
@@ -84,4 +84,4 @@ if __name__ == "__main__":
         port = int(port_str)
 
     uvicorn.run(app, host=host, port=port)
-    print(f"Global Server Serving started at {host}:{port}")
+    print(f"Client Server Serving started at {host}:{port}")
