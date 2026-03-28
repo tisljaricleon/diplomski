@@ -22,7 +22,7 @@ class FlowerClient(fl.client.NumPyClient):
         self.lr = learning_rate
         self.partition_id = partition_id
 
-        model_path = os.path.join("model", "model.pth")
+        model_path = "/home/model/model.pt"
         self.net = load_model(model_path, self.device)
 
 
@@ -39,7 +39,7 @@ class FlowerClient(fl.client.NumPyClient):
             self.device,
         )
 
-        model_path = os.path.join("model", "model.pth")
+        model_path = "/home/model/model.pt"
         save_model(self.net, model_path)
 
         local_round += 1
