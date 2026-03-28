@@ -68,7 +68,15 @@ if __name__ == "__main__":
 
     server_address = config["server"]["address"]
 
-    print(f"Before Loading partition in {time.time() - start:.2f} sec")
+    print("Parameters:")
+    print(f"Partition ID: {partition_id}")
+    print(f"Number of partitions: {num_partitions}")
+    print(f"Batch size: {batch_size}")
+    print(f"Local epochs: {local_epochs}")
+    print(f"Learning rate: {learning_rate}")
+    print(f"Server address: {server_address}")
+
+    print(f"Before loading partition in {time.time() - start:.2f} sec")
 
     start = time.time()
     trainloader, valloader = load_data(partition_id, num_partitions, batch_size)
