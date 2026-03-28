@@ -5,6 +5,7 @@ from PIL import Image
 import io
 import torch
 import os
+import yaml
 from torchvision import transforms
 import torch.nn as nn
 import torch.nn.functional as F
