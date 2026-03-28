@@ -6,9 +6,6 @@ import io
 import torch
 import os
 from torchvision import transforms
-
-
-# Inline Net model definition (copied from task.py)
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -41,10 +38,14 @@ def load_model():
     if not os.path.exists(model_path):
         return None
     try:
-        model = Net()
+        print(f"[MODEL LOAD] Loading model from {model_path}")
         state_dict = torch.load(model_path, map_location=torch.device('cpu'))
+        print(f"[MODEL LOAD] Loaded object type: {type(state_dict)}")
+        model = Net()
         model.load_state_dict(state_dict)
+        print("[MODEL LOAD] Successfully loaded state_dict into Net")
         model.eval()
+        print("[MODEL LOAD] Model set to eval mode")
         return model
     except Exception as e:
         print(f"[MODEL LOAD ERROR] {e}")
