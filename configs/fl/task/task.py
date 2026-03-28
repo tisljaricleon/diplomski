@@ -94,7 +94,8 @@ def train(net, trainloader, valloader, epochs, learning_rate, device):
     criterion = torch.nn.CrossEntropyLoss().to(device)
     optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9)
     net.train()
-    for _ in range(epochs):
+    for epoch in range(epochs):
+        print(f"[Local Training] Epoch {epoch+1}/{epochs}")
         for batch in trainloader:
             images, labels = batch
             optimizer.zero_grad()
