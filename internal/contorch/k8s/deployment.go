@@ -388,6 +388,11 @@ func BuildClientServingDeployment(client *model.FlClient, namespace string) *app
 									   Name:      "modelstorage",
 									   MountPath: "/home/model",
 								   },
+								   {
+									   Name:      "tegrastats-bin",
+									   MountPath: "/usr/bin/tegrastats",
+									   ReadOnly:  true,
+								   },
 							   },
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
@@ -421,7 +426,15 @@ func BuildClientServingDeployment(client *model.FlClient, namespace string) *app
 								},
 							},
 						},
-
+						{
+							Name: "tegrastats-bin",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/usr/bin/tegrastats",
+									Type: corev1.HostPathFile,
+								},
+							},
+						},
 					},
 				},
 			},
