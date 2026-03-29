@@ -18,54 +18,58 @@ import subprocess
 
 def get_tegrastats_stats():
     try:
-        output = subprocess.check_output(['tegrastats', '--interval', '1000', '--count', '1'], stderr=subprocess.STDOUT, text=True)
-        print(f"tegrastats output: {output}")
-        for line in output.splitlines():
-            if 'GR3D_FREQ' in line and 'CPU' in line and 'RAM' in line:
-                ram_used = None
-                ram_total = None
-                swap_used = None
-                swap_total = None
-                cpu_cores = []
-                gpu = None
-                parts = line.split()
-                for i, part in enumerate(parts):
-                    print(f"Parsing part: {part} of line: {line}")
-                    if part == 'RAM' and i+1 < len(parts):
-                        ram_info = parts[i+1]
-                        if '/' in ram_info and 'MB' in ram_info:
-                            ram_used, ram_total = ram_info.replace('MB','').split('/')
-                            ram_used = int(ram_used)
-                            ram_total = int(ram_total)
-                    if part == 'SWAP' and i+1 < len(parts):
-                        swap_info = parts[i+1]
-                        if '/' in swap_info and 'MB' in swap_info:
-                            swap_used, swap_total = swap_info.replace('MB','').split('/')
-                            swap_used = int(swap_used)
-                            swap_total = int(swap_total)
-                    if part == 'CPU' and i+1 < len(parts):
-                        cpu_info = parts[i+1]
-                        if cpu_info.startswith('[') and cpu_info.endswith(']'):
-                            cpu_core_strs = cpu_info[1:-1].split(',')
-                            for core in cpu_core_strs:
-                                if '%@' in core:
-                                    cpu_cores.append(float(core.split('%@')[0]))
-                                else:
-                                    cpu_cores.append(None)
-                    if part == 'GR3D_FREQ' and i > 0 and '%' in parts[i-1]:
-                        gpu_str = parts[i-1]
-                        try:
-                            gpu = int(gpu_str.strip('%'))
-                        except Exception:
-                            gpu = None
-                return {
-                    'ram_used': ram_used,
-                    'ram_total': ram_total,
-                    'swap_used': swap_used,
-                    'swap_total': swap_total,
-                    'cpu_cores': cpu_cores,
-                    'gpu': gpu
-                }
+        proc = subprocess.Popen(['tegrastats', '--interval', '1000'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            line = proc.stdout.readline()
+        finally:
+            proc.terminate()
+            proc.wait()
+        print(f"tegrastats output: {line}")
+        if 'GR3D_FREQ' in line and 'CPU' in line and 'RAM' in line:
+            ram_used = None
+            ram_total = None
+            swap_used = None
+            swap_total = None
+            cpu_cores = []
+            gpu = None
+            parts = line.split()
+            for i, part in enumerate(parts):
+                print(f"Parsing part: {part} of line: {line}")
+                if part == 'RAM' and i+1 < len(parts):
+                    ram_info = parts[i+1]
+                    if '/' in ram_info and 'MB' in ram_info:
+                        ram_used, ram_total = ram_info.replace('MB','').split('/')
+                        ram_used = int(ram_used)
+                        ram_total = int(ram_total)
+                if part == 'SWAP' and i+1 < len(parts):
+                    swap_info = parts[i+1]
+                    if '/' in swap_info and 'MB' in swap_info:
+                        swap_used, swap_total = swap_info.replace('MB','').split('/')
+                        swap_used = int(swap_used)
+                        swap_total = int(swap_total)
+                if part == 'CPU' and i+1 < len(parts):
+                    cpu_info = parts[i+1]
+                    if cpu_info.startswith('[') and cpu_info.endswith(']'):
+                        cpu_core_strs = cpu_info[1:-1].split(',')
+                        for core in cpu_core_strs:
+                            if '%@' in core:
+                                cpu_cores.append(float(core.split('%@')[0]))
+                            else:
+                                cpu_cores.append(None)
+                if part == 'GR3D_FREQ' and i > 0 and '%' in parts[i-1]:
+                    gpu_str = parts[i-1]
+                    try:
+                        gpu = int(gpu_str.strip('%'))
+                    except Exception:
+                        gpu = None
+            return {
+                'ram_used': ram_used,
+                'ram_total': ram_total,
+                'swap_used': swap_used,
+                'swap_total': swap_total,
+                'cpu_cores': cpu_cores,
+                'gpu': gpu
+            }
         return None
     except Exception as e:
         print(f"tegrastats not available or failed: {e}")
