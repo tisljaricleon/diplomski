@@ -11,7 +11,7 @@ curl -X POST http://10.19.4.45:8080/fl/start \
     "costSource": "communication",
     "costConfiguration": {
       "costType": "totalBudget",
-      "budget": 100000
+      "budget": 1000000
     },
     "configurationModel": "minKld",
     "rvaEnabled": false,
