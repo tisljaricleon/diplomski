@@ -431,7 +431,7 @@ func BuildClientServingDeployment(client *model.FlClient, namespace string) *app
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{
 									Path: "/usr/bin/tegrastats",
-									Type: &corev1.HostPathFile,
+									Type: &hostPathTypeFile,
 								},
 							},
 						},
@@ -442,3 +442,6 @@ func BuildClientServingDeployment(client *model.FlClient, namespace string) *app
 	}
 	return deployment
 }
+
+// HostPathType for tegrastats
+hostPathTypeFile := corev1.HostPathFile
