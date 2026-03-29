@@ -347,6 +347,7 @@ func BuildGlobalAggregatorServingDeployment(aggregator *model.FlAggregator, name
 }
 
 func BuildClientServingDeployment(client *model.FlClient, namespace string) *appsv1.Deployment {
+	hostPathTypeFile := corev1.HostPathFile
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      common.GetClientServingDeploymentName(client.Id),
@@ -442,6 +443,3 @@ func BuildClientServingDeployment(client *model.FlClient, namespace string) *app
 	}
 	return deployment
 }
-
-// HostPathType for tegrastats
-hostPathTypeFile := corev1.HostPathFile
