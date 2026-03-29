@@ -12,119 +12,52 @@ import torch.nn.functional as F
 import threading
 import csv
 import datetime
-import psutil
-import subprocess
 
 
-def get_tegrastats_stats():
-    try:
-        proc = subprocess.Popen(['tegrastats', '--interval', '1000'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        try:
-            line = proc.stdout.readline()
-        finally:
-            proc.terminate()
-            proc.wait()
-        print(f"tegrastats output: {line}")
-        if 'GR3D_FREQ' in line and 'CPU' in line and 'RAM' in line:
-            ram_used = None
-            ram_total = None
-            swap_used = None
-            swap_total = None
-            cpu_cores = []
-            gpu = None
-            parts = line.split()
-            for i, part in enumerate(parts):
-                print(f"Parsing part: {part} of line: {line}")
-                if part == 'RAM' and i+1 < len(parts):
-                    ram_info = parts[i+1]
-                    if '/' in ram_info and 'MB' in ram_info:
-                        ram_used, ram_total = ram_info.replace('MB','').split('/')
-                        ram_used = int(ram_used)
-                        ram_total = int(ram_total)
-                if part == 'SWAP' and i+1 < len(parts):
-                    swap_info = parts[i+1]
-                    if '/' in swap_info and 'MB' in swap_info:
-                        swap_used, swap_total = swap_info.replace('MB','').split('/')
-                        swap_used = int(swap_used)
-                        swap_total = int(swap_total)
-                if part == 'CPU' and i+1 < len(parts):
-                    cpu_info = parts[i+1]
-                    if cpu_info.startswith('[') and cpu_info.endswith(']'):
-                        cpu_core_strs = cpu_info[1:-1].split(',')
-                        for core in cpu_core_strs:
-                            if '%@' in core:
-                                cpu_cores.append(float(core.split('%@')[0]))
-                            else:
-                                cpu_cores.append(None)
-                if part == 'GR3D_FREQ':
-                    # Try value before GR3D_FREQ
-                    gpu_str = None
-                    if i > 0:
-                        gpu_str = parts[i-1]
-                    # If not found or not valid, try value after GR3D_FREQ
-                    if (gpu_str is None or not (gpu_str.isdigit() or gpu_str.endswith('%')) ) and i+1 < len(parts):
-                        gpu_str = parts[i+1]
-                    try:
-                        if gpu_str is not None:
-                            if gpu_str.endswith('%'):
-                                gpu = int(gpu_str.strip('%'))
-                            else:
-                                gpu = int(gpu_str)
-                    except Exception:
-                        gpu = None
-            return {
-                'ram_used': ram_used,
-                'ram_total': ram_total,
-                'swap_used': swap_used,
-                'swap_total': swap_total,
-                'cpu_cores': cpu_cores,
-                'gpu': gpu
-            }
-        return None
-    except Exception as e:
-        print(f"tegrastats not available or failed: {e}")
-        return None
+try:
+    from jtop import jtop
+    JTOP_AVAILABLE = True
+except ImportError:
+    JTOP_AVAILABLE = False
 
 
 ongoing_requests = 0
 ongoing_requests_lock = threading.Lock()
 def log_resource_usage(ongoing=None):
-    ram = None
-    ram_total = None
-    swap = None
-    swap_total = None
-    cpu_cores = None
-    gpu = None
-    
-    try:
-        stats = get_tegrastats_stats()
-        if stats:
-            ram = stats['ram_used']
-            ram_total = stats['ram_total']
-            swap = stats['swap_used']
-            swap_total = stats['swap_total']
-            cpu_cores = stats['cpu_cores']
-            gpu = stats['gpu']
-            print(f"[RESOURCE LOG] RAM: {ram}/{ram_total} MB, SWAP: {swap}/{swap_total} MB, CPU cores: {cpu_cores}, GPU: {gpu}%")
-    except Exception as e:
-        print(f"[RESOURCE LOG] tegrastats parsing failed: {e}")
+    jtop_stats = None
+    if JTOP_AVAILABLE:
+        try:
+            with jtop() as jetson:
+                if jetson.ok():
+                    stats = jetson.stats
+                    print(f"[RESOURCE LOG] Stats: {stats}")
+                    jtop_stats = {
+                        'cpu': stats.get('CPU'),
+                        'gpu': stats.get('GPU'),
+                        'ram': stats.get('RAM'),
+                        'temp': stats.get('Temp'),
+                        'power': stats.get('Power'),
+                        'fan': stats.get('FAN'),
+                        'disk': stats.get('Disk'),
+                    }
+                    print(f"[JTOP LOG] {jtop_stats}")
+        except Exception as e:
+            print(f"[RESOURCE LOG] jtop error: {e}")
+    else:
+        print("[RESOURCE LOG] jtop not available")
+
     log_path = "/home/model/resource_log.csv"
     file_exists = os.path.exists(log_path)
     with open(log_path, 'a', newline='') as csvfile:
         writer = csv.writer(csvfile)
         if not file_exists:
             writer.writerow([
-                "timestamp", "ram_used_mb", "ram_total_mb", "swap_used_mb", "swap_total_mb", "cpu_cores", "gpu_percent", "ongoing_requests"
+                "timestamp", "ongoing_requests", "jtop_stats"
             ])
         writer.writerow([
             datetime.datetime.now().isoformat(),
-            ram,
-            ram_total,
-            swap,
-            swap_total,
-            cpu_cores,
-            gpu if gpu is not None else '',
-            ongoing if ongoing is not None else ''
+            ongoing if ongoing is not None else '',
+            jtop_stats if jtop_stats is not None else ''
         ])
 
 

@@ -347,7 +347,6 @@ func BuildGlobalAggregatorServingDeployment(aggregator *model.FlAggregator, name
 }
 
 func BuildClientServingDeployment(client *model.FlClient, namespace string) *appsv1.Deployment {
-	hostPathTypeFile := corev1.HostPathFile
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      common.GetClientServingDeploymentName(client.Id),
@@ -374,27 +373,37 @@ func BuildClientServingDeployment(client *model.FlClient, namespace string) *app
 								{ ContainerPort: common.FL_CLIENT_SERVING_PORT },
 								
 							},
-							   VolumeMounts: []corev1.VolumeMount{
-								   {
-									   Name:      "servingconfig",
-									   MountPath: "/home/client_serving.py",
-									   SubPath:   "client_serving.py",
-								   },
-								   {
-									   Name:      "servingconfig",
-									   MountPath: "/home/client_serving_config.yaml",
-									   SubPath:   "client_serving_config.yaml",
-								   },
-								   {
-									   Name:      "modelstorage",
-									   MountPath: "/home/model",
-								   },
-								   {
-									   Name:      "tegrastats-bin",
-									   MountPath: "/usr/bin/tegrastats",
-									   ReadOnly:  true,
-								   },
-							   },
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "servingconfig",
+									MountPath: "/home/client_serving.py",
+									SubPath:   "client_serving.py",
+								},
+								{
+									Name:      "servingconfig",
+									MountPath: "/home/client_serving_config.yaml",
+									SubPath:   "client_serving_config.yaml",
+								},
+								{
+									Name:      "modelstorage",
+									MountPath: "/home/model",
+								},
+								{
+									Name:      "run",
+									MountPath: "/run",
+								},
+								{
+									Name:      "varrun",
+									MountPath: "/var/run",
+								},
+								{
+									Name:      "dev",
+									MountPath: "/dev",
+								},
+							},
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: func(b bool) *bool { return &b }(true),
+							},
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
 									corev1.ResourceCPU:    resource.MustParse("0.2"),
@@ -428,15 +437,31 @@ func BuildClientServingDeployment(client *model.FlClient, namespace string) *app
 							},
 						},
 						{
-							Name: "tegrastats-bin",
+							Name: "run",
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{
-									Path: "/usr/bin/tegrastats",
-									Type: &hostPathTypeFile,
+									Path: "/run",
+								},
+							},
+						},
+						{
+							Name: "varrun",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/var/run",
+								},
+							},
+						},
+						{
+							Name: "dev",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/dev",
 								},
 							},
 						},
 					},
+					HostNetwork: true,
 				},
 			},
 		},
