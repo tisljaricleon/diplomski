@@ -17,17 +17,45 @@ import psutil
 
 # Use tegrastats for GPU monitoring in Docker (Jetson)
 import subprocess
-def get_tegrastats_gpu():
+def get_tegrastats_stats():
     try:
-        # Run tegrastats once and parse output
         output = subprocess.check_output(['tegrastats', '--interval', '1000', '--count', '1'], stderr=subprocess.STDOUT, text=True)
-        # Example output: RAM 2048/3964MB (lfb 2x4MB) SWAP 0/1982MB (cached 0MB) CPU [0%@345,off,off,off] EMC_FREQ 0% GR3D_FREQ 0% PLL@32.5C
-        for part in output.split():
-            if part.endswith('GR3D_FREQ'):
-                idx = output.split().index(part)
-                gpu_str = output.split()[idx-1]
-                if gpu_str.endswith('%'):
-                    return int(gpu_str.strip('%'))
+        for line in output.splitlines():
+            if 'GR3D_FREQ' in line and 'CPU' in line and 'RAM' in line:
+                ram_used = None
+                ram_total = None
+                cpu_avg = None
+                gpu = None
+                parts = line.split()
+                for i, part in enumerate(parts):
+                    if part == 'RAM' and i+1 < len(parts):
+                        ram_info = parts[i+1]
+                        if '/' in ram_info and 'MB' in ram_info:
+                            ram_used, ram_total = ram_info.replace('MB','').split('/')
+                            ram_used = int(ram_used)
+                            ram_total = int(ram_total)
+                    if part == 'CPU' and i+1 < len(parts):
+                        cpu_info = parts[i+1]
+                        if cpu_info.startswith('[') and cpu_info.endswith(']'):
+                            cpu_cores = cpu_info[1:-1].split(',')
+                            cpu_percents = []
+                            for core in cpu_cores:
+                                if '%@' in core:
+                                    cpu_percents.append(float(core.split('%@')[0]))
+                            if cpu_percents:
+                                cpu_avg = sum(cpu_percents) / len(cpu_percents)
+                    if part == 'GR3D_FREQ' and i > 0 and '%' in parts[i-1]:
+                        gpu_str = parts[i-1]
+                        try:
+                            gpu = int(gpu_str.strip('%'))
+                        except Exception:
+                            gpu = None
+                return {
+                    'cpu_avg': cpu_avg,
+                    'ram_used': ram_used,
+                    'ram_total': ram_total,
+                    'gpu': gpu
+                }
         return None
     except Exception as e:
         print(f"tegrastats not available or failed: {e}")
@@ -51,14 +79,19 @@ def log_resource_usage(request_id=None, ongoing=None):
     except Exception as e:
         mem = None
         print(f"[RESOURCE LOG] Memory usage not found: {e}")
+    cpu = None
+    mem = None
     gpu = None
     if NVML_AVAILABLE:
         try:
-            gpu = get_tegrastats_gpu()
-            print(f"[RESOURCE LOG] GPU usage found: {gpu}%")
+            stats = get_tegrastats_stats()
+            if stats:
+                cpu = stats['cpu_avg']
+                mem = stats['ram_used']
+                gpu = stats['gpu']
+                print(f"[RESOURCE LOG] (tegrastats) CPU: {cpu}%, RAM: {mem} MB, GPU: {gpu}%")
         except Exception as e:
-            gpu = None
-            print(f"[RESOURCE LOG] GPU usage not found: {e}")
+            print(f"[RESOURCE LOG] tegrastats parsing failed: {e}")
     log_path = "/home/model/resource_log.csv"
     file_exists = os.path.exists(log_path)
     with open(log_path, 'a', newline='') as csvfile:
