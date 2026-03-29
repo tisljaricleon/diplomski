@@ -56,14 +56,20 @@ def get_tegrastats_stats():
                                 cpu_cores.append(float(core.split('%@')[0]))
                             else:
                                 cpu_cores.append(None)
-                if part == 'GR3D_FREQ' and i > 0:
-                    gpu_str = parts[i-1]
+                if part == 'GR3D_FREQ':
+                    # Try value before GR3D_FREQ
+                    gpu_str = None
+                    if i > 0:
+                        gpu_str = parts[i-1]
+                    # If not found or not valid, try value after GR3D_FREQ
+                    if (gpu_str is None or not (gpu_str.isdigit() or gpu_str.endswith('%')) ) and i+1 < len(parts):
+                        gpu_str = parts[i+1]
                     try:
-                        # Accept both '0%' and '0' as valid GPU values
-                        if gpu_str.endswith('%'):
-                            gpu = int(gpu_str.strip('%'))
-                        else:
-                            gpu = int(gpu_str)
+                        if gpu_str is not None:
+                            if gpu_str.endswith('%'):
+                                gpu = int(gpu_str.strip('%'))
+                            else:
+                                gpu = int(gpu_str)
                     except Exception:
                         gpu = None
             return {
