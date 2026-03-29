@@ -19,6 +19,7 @@ import subprocess
 def get_tegrastats_stats():
     try:
         output = subprocess.check_output(['tegrastats', '--interval', '1000', '--count', '1'], stderr=subprocess.STDOUT, text=True)
+        print(f"tegrastats output: {output}")
         for line in output.splitlines():
             if 'GR3D_FREQ' in line and 'CPU' in line and 'RAM' in line:
                 ram_used = None
@@ -29,6 +30,7 @@ def get_tegrastats_stats():
                 gpu = None
                 parts = line.split()
                 for i, part in enumerate(parts):
+                    print(f"Parsing part: {part} of line: {line}")
                     if part == 'RAM' and i+1 < len(parts):
                         ram_info = parts[i+1]
                         if '/' in ram_info and 'MB' in ram_info:
@@ -72,7 +74,7 @@ def get_tegrastats_stats():
 
 ongoing_requests = 0
 ongoing_requests_lock = threading.Lock()
-def log_resource_usage(request_id=None, ongoing=None):
+def log_resource_usage(ongoing=None):
     ram = None
     ram_total = None
     swap = None
@@ -98,11 +100,10 @@ def log_resource_usage(request_id=None, ongoing=None):
         writer = csv.writer(csvfile)
         if not file_exists:
             writer.writerow([
-                "timestamp", "request_id", "ram_used_mb", "ram_total_mb", "swap_used_mb", "swap_total_mb", "cpu_cores", "gpu_percent", "ongoing_requests"
+                "timestamp", "ram_used_mb", "ram_total_mb", "swap_used_mb", "swap_total_mb", "cpu_cores", "gpu_percent", "ongoing_requests"
             ])
         writer.writerow([
             datetime.datetime.now().isoformat(),
-            request_id if request_id is not None else '',
             ram,
             ram_total,
             swap,
