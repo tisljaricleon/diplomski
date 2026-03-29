@@ -13,10 +13,9 @@ import threading
 import csv
 import datetime
 import psutil
-
-
-# Use tegrastats for GPU monitoring in Docker (Jetson)
 import subprocess
+
+
 def get_tegrastats_stats():
     try:
         output = subprocess.check_output(['tegrastats', '--interval', '1000', '--count', '1'], stderr=subprocess.STDOUT, text=True)
@@ -24,7 +23,9 @@ def get_tegrastats_stats():
             if 'GR3D_FREQ' in line and 'CPU' in line and 'RAM' in line:
                 ram_used = None
                 ram_total = None
-                cpu_avg = None
+                swap_used = None
+                swap_total = None
+                cpu_cores = []
                 gpu = None
                 parts = line.split()
                 for i, part in enumerate(parts):
@@ -34,16 +35,21 @@ def get_tegrastats_stats():
                             ram_used, ram_total = ram_info.replace('MB','').split('/')
                             ram_used = int(ram_used)
                             ram_total = int(ram_total)
+                    if part == 'SWAP' and i+1 < len(parts):
+                        swap_info = parts[i+1]
+                        if '/' in swap_info and 'MB' in swap_info:
+                            swap_used, swap_total = swap_info.replace('MB','').split('/')
+                            swap_used = int(swap_used)
+                            swap_total = int(swap_total)
                     if part == 'CPU' and i+1 < len(parts):
                         cpu_info = parts[i+1]
                         if cpu_info.startswith('[') and cpu_info.endswith(']'):
-                            cpu_cores = cpu_info[1:-1].split(',')
-                            cpu_percents = []
-                            for core in cpu_cores:
+                            cpu_core_strs = cpu_info[1:-1].split(',')
+                            for core in cpu_core_strs:
                                 if '%@' in core:
-                                    cpu_percents.append(float(core.split('%@')[0]))
-                            if cpu_percents:
-                                cpu_avg = sum(cpu_percents) / len(cpu_percents)
+                                    cpu_cores.append(float(core.split('%@')[0]))
+                                else:
+                                    cpu_cores.append(None)
                     if part == 'GR3D_FREQ' and i > 0 and '%' in parts[i-1]:
                         gpu_str = parts[i-1]
                         try:
@@ -51,61 +57,61 @@ def get_tegrastats_stats():
                         except Exception:
                             gpu = None
                 return {
-                    'cpu_avg': cpu_avg,
                     'ram_used': ram_used,
                     'ram_total': ram_total,
+                    'swap_used': swap_used,
+                    'swap_total': swap_total,
+                    'cpu_cores': cpu_cores,
                     'gpu': gpu
                 }
         return None
     except Exception as e:
         print(f"tegrastats not available or failed: {e}")
         return None
-NVML_AVAILABLE = True
 
 
 ongoing_requests = 0
 ongoing_requests_lock = threading.Lock()
 def log_resource_usage(request_id=None, ongoing=None):
-    process = psutil.Process(os.getpid())
-    try:
-        cpu = process.cpu_percent(interval=0.01)
-        print(f"[RESOURCE LOG] CPU usage found: {cpu}%")
-    except Exception as e:
-        cpu = None
-        print(f"[RESOURCE LOG] CPU usage not found: {e}")
-    try:
-        mem = process.memory_info().rss / (1024 * 1024)  # MB
-        print(f"[RESOURCE LOG] Memory usage found: {mem} MB")
-    except Exception as e:
-        mem = None
-        print(f"[RESOURCE LOG] Memory usage not found: {e}")
-    cpu = None
-    mem = None
+    ram = None
+    ram_total = None
+    swap = None
+    swap_total = None
+    cpu_cores = None
     gpu = None
-    if NVML_AVAILABLE:
-        try:
-            stats = get_tegrastats_stats()
-            if stats:
-                cpu = stats['cpu_avg']
-                mem = stats['ram_used']
-                gpu = stats['gpu']
-                print(f"[RESOURCE LOG] (tegrastats) CPU: {cpu}%, RAM: {mem} MB, GPU: {gpu}%")
-        except Exception as e:
-            print(f"[RESOURCE LOG] tegrastats parsing failed: {e}")
+    
+    try:
+        stats = get_tegrastats_stats()
+        if stats:
+            ram = stats['ram_used']
+            ram_total = stats['ram_total']
+            swap = stats['swap_used']
+            swap_total = stats['swap_total']
+            cpu_cores = stats['cpu_cores']
+            gpu = stats['gpu']
+            print(f"[RESOURCE LOG] RAM: {ram}/{ram_total} MB, SWAP: {swap}/{swap_total} MB, CPU cores: {cpu_cores}, GPU: {gpu}%")
+    except Exception as e:
+        print(f"[RESOURCE LOG] tegrastats parsing failed: {e}")
     log_path = "/home/model/resource_log.csv"
     file_exists = os.path.exists(log_path)
     with open(log_path, 'a', newline='') as csvfile:
         writer = csv.writer(csvfile)
         if not file_exists:
-            writer.writerow(["timestamp", "request_id", "cpu_percent", "memory_mb", "gpu_percent", "ongoing_requests"])
+            writer.writerow([
+                "timestamp", "request_id", "ram_used_mb", "ram_total_mb", "swap_used_mb", "swap_total_mb", "cpu_cores", "gpu_percent", "ongoing_requests"
+            ])
         writer.writerow([
             datetime.datetime.now().isoformat(),
             request_id if request_id is not None else '',
-            cpu,
-            mem,
+            ram,
+            ram_total,
+            swap,
+            swap_total,
+            cpu_cores,
             gpu if gpu is not None else '',
             ongoing if ongoing is not None else ''
         ])
+
 
 class Net(nn.Module):
     def __init__(self):
@@ -143,11 +149,15 @@ def load_model():
         print("[MODEL LOAD] Successfully loaded state_dict into Net")
         model.eval()
         print("[MODEL LOAD] Model set to eval mode")
+        model.to(device)
+        print(f"[MODEL LOAD] Model moved to device: {device}")
         return model
     except Exception as e:
         print(f"[MODEL LOAD ERROR] {e}")
         return None
 
+cuda_available = torch.cuda.is_available()
+device = torch.device("cuda:0" if cuda_available else "cpu")
 model = load_model()
 cifar10_transform = transforms.Compose([
     transforms.Resize((32, 32)),
@@ -159,26 +169,29 @@ cifar10_transform = transforms.Compose([
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
     global model, ongoing_requests
-    request_id = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
+
     with ongoing_requests_lock:
         ongoing_requests += 1
         current_ongoing = ongoing_requests
+
     try:
         if model is None:
             model = load_model()
             if model is None:
-                log_resource_usage(request_id, current_ongoing)
+                log_resource_usage(current_ongoing)
                 return JSONResponse({"label": None, "error": "Model not found"}, status_code=200)
+            
         image = Image.open(io.BytesIO(await file.read())).convert("RGB")
         tensor = cifar10_transform(image).unsqueeze(0)
+        tensor = tensor.to(device)
         with torch.no_grad():
             output = model(tensor)
             pred = output.argmax(dim=1).item()
-        log_resource_usage(request_id, current_ongoing)
+        log_resource_usage(current_ongoing)
         return JSONResponse({"label": int(pred)})
     except Exception as e:
-        log_resource_usage(request_id, current_ongoing)
-        return JSONResponse({"error": str(e)}, status_code=500)
+        log_resource_usage(current_ongoing)
+        return JSONResponse({ "label": None, "error": str(e)}, status_code=500)
     finally:
         with ongoing_requests_lock:
             ongoing_requests -= 1
@@ -195,4 +208,4 @@ if __name__ == "__main__":
         port = int(port_str)
 
     uvicorn.run(app, host=host, port=port)
-    print(f"Client Server Serving started at {host}:{port}")
+    print(f"Client server serving started at {host}:{port}")
