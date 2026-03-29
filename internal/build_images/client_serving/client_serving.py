@@ -9,6 +9,58 @@ import yaml
 from torchvision import transforms
 import torch.nn as nn
 import torch.nn.functional as F
+import threading
+import csv
+import datetime
+import psutil
+
+try:
+    import pynvml
+    pynvml.nvmlInit()
+    NVML_AVAILABLE = True
+except ImportError:
+    NVML_AVAILABLE = False
+
+
+ongoing_requests = 0
+ongoing_requests_lock = threading.Lock()
+def log_resource_usage(request_id=None, ongoing=None):
+    process = psutil.Process(os.getpid())
+    try:
+        cpu = process.cpu_percent(interval=0.01)
+        print(f"[RESOURCE LOG] CPU usage found: {cpu}%")
+    except Exception as e:
+        cpu = None
+        print(f"[RESOURCE LOG] CPU usage not found: {e}")
+    try:
+        mem = process.memory_info().rss / (1024 * 1024)  # MB
+        print(f"[RESOURCE LOG] Memory usage found: {mem} MB")
+    except Exception as e:
+        mem = None
+        print(f"[RESOURCE LOG] Memory usage not found: {e}")
+    gpu = None
+    if NVML_AVAILABLE:
+        try:
+            handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+            gpu = pynvml.nvmlDeviceGetUtilizationRates(handle).gpu
+            print(f"[RESOURCE LOG] GPU usage found: {gpu}%")
+        except Exception as e:
+            gpu = None
+            print(f"[RESOURCE LOG] GPU usage not found: {e}")
+    log_path = "/home/model/resource_log.csv"
+    file_exists = os.path.exists(log_path)
+    with open(log_path, 'a', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        if not file_exists:
+            writer.writerow(["timestamp", "request_id", "cpu_percent", "memory_mb", "gpu_percent", "ongoing_requests"])
+        writer.writerow([
+            datetime.datetime.now().isoformat(),
+            request_id if request_id is not None else '',
+            cpu,
+            mem,
+            gpu if gpu is not None else '',
+            ongoing if ongoing is not None else ''
+        ])
 
 class Net(nn.Module):
     def __init__(self):
@@ -33,7 +85,6 @@ app = FastAPI()
 def get_model_path():
     return f"/home/model/model.pt"
 
-
 def load_model():
     model_path = get_model_path()
     if not os.path.exists(model_path):
@@ -52,26 +103,40 @@ def load_model():
         print(f"[MODEL LOAD ERROR] {e}")
         return None
 
+model = load_model()
 cifar10_transform = transforms.Compose([
     transforms.Resize((32, 32)),
     transforms.ToTensor(),
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
 ])
 
+
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
-    model = load_model()
-    if model is None:
-        return JSONResponse({"prediction": None, "error": "Model not found"}, status_code=200)
+    global model, ongoing_requests
+    request_id = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
+    with ongoing_requests_lock:
+        ongoing_requests += 1
+        current_ongoing = ongoing_requests
     try:
+        if model is None:
+            model = load_model()
+            if model is None:
+                log_resource_usage(request_id, current_ongoing)
+                return JSONResponse({"label": None, "error": "Model not found"}, status_code=200)
         image = Image.open(io.BytesIO(await file.read())).convert("RGB")
         tensor = cifar10_transform(image).unsqueeze(0)
         with torch.no_grad():
             output = model(tensor)
             pred = output.argmax(dim=1).item()
-        return JSONResponse({"prediction": int(pred)})
+        log_resource_usage(request_id, current_ongoing)
+        return JSONResponse({"label": int(pred)})
     except Exception as e:
+        log_resource_usage(request_id, current_ongoing)
         return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        with ongoing_requests_lock:
+            ongoing_requests -= 1
 
 
 if __name__ == "__main__":

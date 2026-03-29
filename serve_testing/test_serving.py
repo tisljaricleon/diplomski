@@ -1,7 +1,3 @@
-#!/usr/bin/env python
-"""
-Test script to send simultaneous requests to multiple client servers and monitor latency, CPU, memory, and GPU usage.
-"""
 import requests
 import threading
 import time
