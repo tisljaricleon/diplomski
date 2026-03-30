@@ -13,11 +13,70 @@ import threading
 import csv
 import datetime
 from jtop import jtop
+import asyncio
+import time
+
+# Jtop stats monitoring & logging
+latest_stats = {}
+def monitor_jtop():
+    try:
+        with jtop() as jetson:
+            while jetson.ok():
+                latest_stats.update(jetson.stats)
+    except Exception as e:
+        print(f"[JTOP MONITOR] Error: {e}")
 
 
-ongoing_requests = 0
-ongoing_requests_lock = threading.Lock()
+def log_resource_usage():
+    stat_fields = [
+        'timestamp', 'cpu1', 'cpu2', 'cpu3', 'cpu4', 'cpu5', 'cpu6', 'gpu', 'ram', 'swap',
+        'fan', 'temp_cpu', 'temp_gpu', 'temp_soc0', 'temp_soc1', 'temp_soc2', 'temp_therm_junction',
+        'power_vdd_cpu_gpu_cv', 'power_vdd_soc', 'power_tot', 'jetson_clocks', 'nvp_model'
+    ]
+    log_path = "/home/model/resource_log.csv"
 
+    if os.path.exists(log_path):
+        with open(log_path, 'w', newline='') as file:
+            pass
+
+    while True:
+        row = [
+            datetime.datetime.now().isoformat(),
+            latest_stats.get('CPU1', ''),
+            latest_stats.get('CPU2', ''),
+            latest_stats.get('CPU3', ''),
+            latest_stats.get('CPU4', ''),
+            latest_stats.get('CPU5', ''),
+            latest_stats.get('CPU6', ''),
+            latest_stats.get('GPU', ''),
+            latest_stats.get('RAM', ''),
+            latest_stats.get('SWAP', ''),
+            latest_stats.get('Fan pwmfan0', ''),
+            latest_stats.get('Temp cpu', ''),
+            latest_stats.get('Temp gpu', ''),
+            latest_stats.get('Temp soc0', ''),
+            latest_stats.get('Temp soc1', ''),
+            latest_stats.get('Temp soc2', ''),
+            latest_stats.get('Temp tj', ''),
+            latest_stats.get('Power VDD_CPU_GPU_CV', ''),
+            latest_stats.get('Power VDD_SOC', ''),
+            latest_stats.get('Power TOT', ''),
+            latest_stats.get('jetson_clocks', ''),
+            latest_stats.get('nvp model', ''),
+        ]
+        file_exists = os.path.exists(log_path)
+        with open(log_path, 'a', newline='') as file:
+            writer = csv.writer(file)
+            if not file_exists:
+                writer.writerow(stat_fields)
+            writer.writerow(row)
+        time.sleep(0.5)
+
+threading.Thread(target=monitor_jtop, daemon=True).start()
+threading.Thread(target=log_resource_usage, daemon=True).start()
+
+
+# Defining device, transforms, Net
 cuda_available = torch.cuda.is_available()
 device = torch.device("cuda:0" if cuda_available else "cpu")
 cifar10_transform = transforms.Compose([
@@ -25,61 +84,6 @@ cifar10_transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
 ])
-
-app = FastAPI()
-
-
-def log_resource_usage(ongoing_requests):
-    jtop_stats = None
-    try:
-        with jtop() as jetson:
-            if jetson.ok():
-                stats = jetson.stats
-                if 'time' in stats and isinstance(stats['time'], datetime.datetime):
-                    stats['timestamp'] = stats['time']
-                jtop_stats = {
-                    'timestamp': stats.get('timestamp'),
-                    'ongoing_requests': ongoing_requests,
-                    'cpu1': stats.get('CPU1'),
-                    'cpu2': stats.get('CPU2'),
-                    'cpu3': stats.get('CPU3'),
-                    'cpu4': stats.get('CPU4'),
-                    'cpu5': stats.get('CPU5'),
-                    'cpu6': stats.get('CPU6'),
-                    'gpu': stats.get('GPU'),
-                    'ram': stats.get('RAM'),
-                    'swap': stats.get('SWAP'),
-                    'fan': stats.get('Fan pwmfan0'),
-                    'temp_cpu': stats.get('Temp cpu'),
-                    'temp_gpu': stats.get('Temp gpu'),
-                    'temp_soc0': stats.get('Temp soc0'),
-                    'temp_soc1': stats.get('Temp soc1'),
-                    'temp_soc2': stats.get('Temp soc2'),
-                    'temp_therm_junction': stats.get('Temp tj'),
-                    'power_vdd_cpu_gpu_cv': stats.get('Power VDD_CPU_GPU_CV'),
-                    'power_vdd_soc': stats.get('Power VDD_SOC'),
-                    'power_tot': stats.get('Power TOT'),
-                    'jetson_clocks': stats.get('jetson_clocks'),
-                    'nvp_model': stats.get('nvp model')
-                }
-    except Exception as e:
-        print(f"[RESOURCE LOG] Error: {e}")
-
-    log_path = "/home/model/resource_log.csv"
-    stat_fields = [
-        'timestamp', 'ongoing_requests', 'cpu1', 'cpu2', 'cpu3', 'cpu4', 'cpu5', 'cpu6', 'gpu', 'ram', 'swap',
-        'fan', 'temp_cpu', 'temp_gpu', 'temp_soc0', 'temp_soc1', 'temp_soc2', 'temp_therm_junction',
-        'power_vdd_cpu_gpu_cv', 'power_vdd_soc', 'power_tot', 'jetson_clocks', 'nvp_model'
-    ]
-    with open(log_path, 'w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(stat_fields)
-        if jtop_stats is not None:
-            row = [jtop_stats.get(field, '') for field in stat_fields]
-        else:
-            row = ['' for _ in stat_fields]
-        writer.writerow(row)
-
 
 class Net(nn.Module):
     def __init__(self):
@@ -100,6 +104,7 @@ class Net(nn.Module):
         return self.fc3(x)
 
 
+# Model loading
 def load_model():
     model_path = "/home/model/model.pt"
     if not os.path.exists(model_path):
@@ -118,43 +123,33 @@ def load_model():
         print(f"[MODEL LOAD] Error: {e}")
         return None
 
+
 model = load_model()
 
 
+# Prediction endpoint
+def inference(tensor):
+    with torch.no_grad():
+        output = model(tensor)
+        return output.argmax(dim=1).item()
+
+
+app = FastAPI()          
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
-    global model, ongoing_requests
-
-    with ongoing_requests_lock:
-        ongoing_requests += 1
-        current_ongoing = ongoing_requests
-
+    global model
     try:
         if model is None:
             model = load_model()
             if model is None:
-                log_resource_usage(current_ongoing)
                 return JSONResponse({"label": None, "error": "Model not found"}, status_code=404)
-            
         image = Image.open(io.BytesIO(await file.read())).convert("RGB")
-
         tensor = cifar10_transform(image).unsqueeze(0)
         tensor = tensor.to(device)
-        # Print device info for debugging
-        print(f"[DEBUG] model device: {next(model.parameters()).device}")
-        print(f"[DEBUG] tensor device: {tensor.device}")
-        with torch.no_grad():
-            output = model(tensor)
-            pred = output.argmax(dim=1).item()
-
-        log_resource_usage(current_ongoing)
-        return JSONResponse({"label": int(pred)})
+        prediction = await asyncio.to_thread(inference, tensor)
+        return JSONResponse({"label": int(prediction)})
     except Exception as e:
-        log_resource_usage(current_ongoing)
         return JSONResponse({ "label": None, "error": str(e)}, status_code=500)
-    finally:
-        with ongoing_requests_lock:
-            ongoing_requests -= 1
 
 
 if __name__ == "__main__":
@@ -166,5 +161,5 @@ if __name__ == "__main__":
         host, port_str = address.rsplit(":", 1)
         port = int(port_str)
 
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(app, host=host, port=port, workers=4)
     print(f"Client serving started at {host}:{port}")
