@@ -12,53 +12,73 @@ import torch.nn.functional as F
 import threading
 import csv
 import datetime
-
-
-try:
-    from jtop import jtop
-    JTOP_AVAILABLE = True
-except ImportError:
-    JTOP_AVAILABLE = False
+from jtop import jtop
 
 
 ongoing_requests = 0
 ongoing_requests_lock = threading.Lock()
-def log_resource_usage(ongoing=None):
+
+cuda_available = torch.cuda.is_available()
+device = torch.device("cuda:0" if cuda_available else "cpu")
+cifar10_transform = transforms.Compose([
+    transforms.Resize((32, 32)),
+    transforms.ToTensor(),
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+])
+
+app = FastAPI()
+
+
+def log_resource_usage(ongoing_requests):
     jtop_stats = None
-    if JTOP_AVAILABLE:
-        try:
-            with jtop() as jetson:
-                if jetson.ok():
-                    stats = jetson.stats
-                    print(f"[RESOURCE LOG] Stats: {stats}")
-                    jtop_stats = {
-                        'cpu': stats.get('CPU'),
-                        'gpu': stats.get('GPU'),
-                        'ram': stats.get('RAM'),
-                        'temp': stats.get('Temp'),
-                        'power': stats.get('Power'),
-                        'fan': stats.get('FAN'),
-                        'disk': stats.get('Disk'),
-                    }
-                    print(f"[JTOP LOG] {jtop_stats}")
-        except Exception as e:
-            print(f"[RESOURCE LOG] jtop error: {e}")
-    else:
-        print("[RESOURCE LOG] jtop not available")
+    try:
+        with jtop() as jetson:
+            if jetson.ok():
+                stats = jetson.stats
+                if 'time' in stats and isinstance(stats['time'], datetime.datetime):
+                    stats['timestamp'] = stats['time']
+                jtop_stats = {
+                    'timestamp': stats.get('timestamp'),
+                    'ongoing_requests': ongoing_requests,
+                    'cpu1': stats.get('CPU1'),
+                    'cpu2': stats.get('CPU2'),
+                    'cpu3': stats.get('CPU3'),
+                    'cpu4': stats.get('CPU4'),
+                    'cpu5': stats.get('CPU5'),
+                    'cpu6': stats.get('CPU6'),
+                    'gpu': stats.get('GPU'),
+                    'ram': stats.get('RAM'),
+                    'swap': stats.get('SWAP'),
+                    'fan': stats.get('Fan pwmfan0'),
+                    'temp_cpu': stats.get('Temp cpu'),
+                    'temp_gpu': stats.get('Temp gpu'),
+                    'temp_soc0': stats.get('Temp soc0'),
+                    'temp_soc1': stats.get('Temp soc1'),
+                    'temp_soc2': stats.get('Temp soc2'),
+                    'temp_therm_junction': stats.get('Temp tj'),
+                    'power_vdd_cpu_gpu_cv': stats.get('Power VDD_CPU_GPU_CV'),
+                    'power_vdd_soc': stats.get('Power VDD_SOC'),
+                    'power_tot': stats.get('Power TOT'),
+                    'jetson_clocks': stats.get('jetson_clocks'),
+                    'nvp_model': stats.get('nvp model')
+                }
+    except Exception as e:
+        print(f"[RESOURCE LOG] Error: {e}")
 
     log_path = "/home/model/resource_log.csv"
-    file_exists = os.path.exists(log_path)
-    with open(log_path, 'a', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        if not file_exists:
-            writer.writerow([
-                "timestamp", "ongoing_requests", "jtop_stats"
-            ])
-        writer.writerow([
-            datetime.datetime.now().isoformat(),
-            ongoing if ongoing is not None else '',
-            jtop_stats if jtop_stats is not None else ''
-        ])
+    stat_fields = [
+        'timestamp', 'ongoing_requests', 'cpu1', 'cpu2', 'cpu3', 'cpu4', 'cpu5', 'cpu6', 'gpu', 'ram', 'swap',
+        'fan', 'temp_cpu', 'temp_gpu', 'temp_soc0', 'temp_soc1', 'temp_soc2', 'temp_therm_junction',
+        'power_vdd_cpu_gpu_cv', 'power_vdd_soc', 'power_tot', 'jetson_clocks', 'nvp_model'
+    ]
+    with open(log_path, 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(stat_fields)
+        if jtop_stats is not None:
+            row = [jtop_stats.get(field, '') for field in stat_fields]
+        else:
+            row = ['' for _ in stat_fields]
+        writer.writerow(row)
 
 
 class Net(nn.Module):
@@ -79,13 +99,9 @@ class Net(nn.Module):
         x = F.relu(self.fc2(x))
         return self.fc3(x)
 
-app = FastAPI()
-
-def get_model_path():
-    return f"/home/model/model.pt"
 
 def load_model():
-    model_path = get_model_path()
+    model_path = "/home/model/model.pt"
     if not os.path.exists(model_path):
         return None
     try:
@@ -94,24 +110,15 @@ def load_model():
         print(f"[MODEL LOAD] Loaded object type: {type(state_dict)}")
         model = Net()
         model.load_state_dict(state_dict)
-        print("[MODEL LOAD] Successfully loaded state_dict into Net")
         model.eval()
-        print("[MODEL LOAD] Model set to eval mode")
         model.to(device)
         print(f"[MODEL LOAD] Model moved to device: {device}")
         return model
     except Exception as e:
-        print(f"[MODEL LOAD ERROR] {e}")
+        print(f"[MODEL LOAD] Error: {e}")
         return None
 
-cuda_available = torch.cuda.is_available()
-device = torch.device("cuda:0" if cuda_available else "cpu")
 model = load_model()
-cifar10_transform = transforms.Compose([
-    transforms.Resize((32, 32)),
-    transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-])
 
 
 @app.post("/predict")
@@ -127,7 +134,7 @@ async def predict(file: UploadFile = File(...)):
             model = load_model()
             if model is None:
                 log_resource_usage(current_ongoing)
-                return JSONResponse({"label": None, "error": "Model not found"}, status_code=200)
+                return JSONResponse({"label": None, "error": "Model not found"}, status_code=404)
             
         image = Image.open(io.BytesIO(await file.read())).convert("RGB")
         tensor = cifar10_transform(image).unsqueeze(0)
@@ -135,6 +142,7 @@ async def predict(file: UploadFile = File(...)):
         with torch.no_grad():
             output = model(tensor)
             pred = output.argmax(dim=1).item()
+
         log_resource_usage(current_ongoing)
         return JSONResponse({"label": int(pred)})
     except Exception as e:
@@ -150,10 +158,9 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
 
     address = config.get("server", {}).get("address", "0.0.0.0:8000")
-
     if ":" in address:
         host, port_str = address.rsplit(":", 1)
         port = int(port_str)
 
     uvicorn.run(app, host=host, port=port)
-    print(f"Client server serving started at {host}:{port}")
+    print(f"Client serving started at {host}:{port}")
