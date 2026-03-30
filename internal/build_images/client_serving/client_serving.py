@@ -137,8 +137,12 @@ async def predict(file: UploadFile = File(...)):
                 return JSONResponse({"label": None, "error": "Model not found"}, status_code=404)
             
         image = Image.open(io.BytesIO(await file.read())).convert("RGB")
+
         tensor = cifar10_transform(image).unsqueeze(0)
         tensor = tensor.to(device)
+        # Print device info for debugging
+        print(f"[DEBUG] model device: {next(model.parameters()).device}")
+        print(f"[DEBUG] tensor device: {tensor.device}")
         with torch.no_grad():
             output = model(tensor)
             pred = output.argmax(dim=1).item()
