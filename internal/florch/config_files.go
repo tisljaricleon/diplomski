@@ -114,7 +114,7 @@ func BuildLocalAggregatorServingConfigFiles() (map[string]string, error) {
 
 func BuildClientServingConfigFiles() (map[string]string, error) {
 	configDirectoryPath := "../../configs/fl/"
-	buildImagesPath := "../../internal/build_images/client/"
+	buildImagesPath := "../../internal/build_images/client_serving/"
 
 	taskBytesArray, err := os.ReadFile(fmt.Sprint(configDirectoryPath, "task/task.py"))
 	if err != nil {
