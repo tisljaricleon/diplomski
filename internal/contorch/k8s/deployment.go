@@ -38,44 +38,17 @@ func BuildGlobalAggregatorDeployment(aggregator *model.FlAggregator, namespace s
 									ContainerPort: aggregator.Port,
 								},
 							},
-							   VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "mpspipe",
-									MountPath: "/tmp/nvidia-mps",
-								},
-								{
-									Name:      "mpslog",
-									MountPath: "/tmp/nvidia-mps-log",
-								},
-								Env: []corev1.EnvVar{
-									{
-										Name:  "CUDA_MPS_PIPE_DIRECTORY",
-										Value: "/tmp/nvidia-mps",
-									},
-									{
-										Name:  "CUDA_MPS_LOG_DIRECTORY",
-										Value: "/tmp/nvidia-mps-log",
-									},
-								},
-								{
-									Name:      "gaconfig",
-									MountPath: "/home/task.py",
-									SubPath:   "task.py",
-								},
-								{
-									Name:      "gaconfig",
-									MountPath: "/home/global_server.py",
-									SubPath:   "global_server.py",
-								},
-								{
-									Name:      "gaconfig",
-									MountPath: "/home/global_server_config.yaml",
-									SubPath:   "global_server_config.yaml",
-								},
-								{
-									Name:      "modelstorage",
-									MountPath: "/home/model",
-								},
+							VolumeMounts: []corev1.VolumeMount{
+								{ Name: "mpspipe", MountPath: "/tmp/nvidia-mps" },
+								{ Name: "mpslog", MountPath: "/tmp/nvidia-mps-log" },
+								{ Name: "gaconfig", MountPath: "/home/task.py", SubPath: "task.py" },
+								{ Name: "gaconfig", MountPath: "/home/global_server.py", SubPath: "global_server.py" },
+								{ Name: "gaconfig", MountPath: "/home/global_server_config.yaml", SubPath: "global_server_config.yaml" },
+								{ Name: "modelstorage", MountPath: "/home/model" },
+							},
+							Env: []corev1.EnvVar{
+								{ Name: "CUDA_MPS_PIPE_DIRECTORY", Value: "/tmp/nvidia-mps" },
+								{ Name: "CUDA_MPS_LOG_DIRECTORY", Value: "/tmp/nvidia-mps-log" },
 							},
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
@@ -162,34 +135,15 @@ func BuildLocalAggregatorDeployment(aggregator *model.FlAggregator, namespace st
 									ContainerPort: aggregator.Port,
 								},
 							},
-							   VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "mpspipe",
-									MountPath: "/tmp/nvidia-mps",
-								},
-								{
-									Name:      "mpslog",
-									MountPath: "/tmp/nvidia-mps-log",
-								},
-								Env: []corev1.EnvVar{
-									{
-										Name:  "CUDA_MPS_PIPE_DIRECTORY",
-										Value: "/tmp/nvidia-mps",
-									},
-									{
-										Name:  "CUDA_MPS_LOG_DIRECTORY",
-										Value: "/tmp/nvidia-mps-log",
-									},
-								},
-								{
-									Name:      "laconfig",
-									MountPath: "/home/local_server_config.yaml",
-									SubPath:   "local_server_config.yaml",
-								},
-								{
-									Name:      "modelstorage",
-									MountPath: "/home/model",
-								},
+							VolumeMounts: []corev1.VolumeMount{
+								{ Name: "mpspipe", MountPath: "/tmp/nvidia-mps" },
+								{ Name: "mpslog", MountPath: "/tmp/nvidia-mps-log" },
+								{ Name: "laconfig", MountPath: "/home/local_server_config.yaml", SubPath: "local_server_config.yaml" },
+								{ Name: "modelstorage", MountPath: "/home/model" },
+							},
+							Env: []corev1.EnvVar{
+								{ Name: "CUDA_MPS_PIPE_DIRECTORY", Value: "/tmp/nvidia-mps" },
+								{ Name: "CUDA_MPS_LOG_DIRECTORY", Value: "/tmp/nvidia-mps-log" },
 							},
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
@@ -271,44 +225,17 @@ func BuildClientDeployment(client *model.FlClient, namespace string) *appsv1.Dep
 						{
 							Name:  "fl-client",
 							Image: common.FL_CLIENT_IMAGE,
-							   VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "mpspipe",
-									MountPath: "/tmp/nvidia-mps",
-								},
-								{
-									Name:      "mpslog",
-									MountPath: "/tmp/nvidia-mps-log",
-								},
-								Env: []corev1.EnvVar{
-									{
-										Name:  "CUDA_MPS_PIPE_DIRECTORY",
-										Value: "/tmp/nvidia-mps",
-									},
-									{
-										Name:  "CUDA_MPS_LOG_DIRECTORY",
-										Value: "/tmp/nvidia-mps-log",
-									},
-								},
-								{
-									Name:      "clientconfig",
-									MountPath: "/home/task.py",
-									SubPath:   "task.py",
-								},
-								{
-									Name:      "clientconfig",
-									MountPath: "/home/client.py",
-									SubPath:   "client.py",
-								},
-								{
-									Name:      "clientconfig",
-									MountPath: "/home/client_config.yaml",
-									SubPath:   "client_config.yaml",
-								},
-								{
-									Name:      "modelstorage",
-									MountPath: "/home/model",
-								},
+							VolumeMounts: []corev1.VolumeMount{
+								{ Name: "mpspipe", MountPath: "/tmp/nvidia-mps" },
+								{ Name: "mpslog", MountPath: "/tmp/nvidia-mps-log" },
+								{ Name: "clientconfig", MountPath: "/home/task.py", SubPath: "task.py" },
+								{ Name: "clientconfig", MountPath: "/home/client.py", SubPath: "client.py" },
+								{ Name: "clientconfig", MountPath: "/home/client_config.yaml", SubPath: "client_config.yaml" },
+								{ Name: "modelstorage", MountPath: "/home/model" },
+							},
+							Env: []corev1.EnvVar{
+								{ Name: "CUDA_MPS_PIPE_DIRECTORY", Value: "/tmp/nvidia-mps" },
+								{ Name: "CUDA_MPS_LOG_DIRECTORY", Value: "/tmp/nvidia-mps-log" },
 							},
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
@@ -394,35 +321,15 @@ func BuildGlobalAggregatorServingDeployment(aggregator *model.FlAggregator, name
 								{ ContainerPort: common.GLOBAL_AGGREGATOR_SERVING_PORT },
 								
 							},
-							   VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "mpspipe",
-									MountPath: "/tmp/nvidia-mps",
-								},
-								{
-									Name:      "mpslog",
-									MountPath: "/tmp/nvidia-mps-log",
-								},
-								Env: []corev1.EnvVar{
-									{
-										Name:  "CUDA_MPS_PIPE_DIRECTORY",
-										Value: "/tmp/nvidia-mps",
-									},
-									{
-										Name:  "CUDA_MPS_LOG_DIRECTORY",
-										Value: "/tmp/nvidia-mps-log",
-									},
-								},
-								{
-									Name:      "servingconfig",
-									MountPath: "/home/global_server_serving_config.yaml",
-									SubPath:   "global_server_serving_config.yaml",
-								},
-								{
-									Name:      "modelstorage",
-									MountPath: "/home/model",
-								},
-								
+							VolumeMounts: []corev1.VolumeMount{
+								{ Name: "mpspipe", MountPath: "/tmp/nvidia-mps" },
+								{ Name: "mpslog", MountPath: "/tmp/nvidia-mps-log" },
+								{ Name: "servingconfig", MountPath: "/home/global_server_serving_config.yaml", SubPath: "global_server_serving_config.yaml" },
+								{ Name: "modelstorage", MountPath: "/home/model" },
+							},
+							Env: []corev1.EnvVar{
+								{ Name: "CUDA_MPS_PIPE_DIRECTORY", Value: "/tmp/nvidia-mps" },
+								{ Name: "CUDA_MPS_LOG_DIRECTORY", Value: "/tmp/nvidia-mps-log" },
 							},
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
@@ -508,55 +415,20 @@ func BuildClientServingDeployment(client *model.FlClient, namespace string) *app
 								{ ContainerPort: common.FL_CLIENT_SERVING_PORT },
 								
 							},
-							   VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "mpspipe",
-									MountPath: "/tmp/nvidia-mps",
-								},
-								{
-									Name:      "mpslog",
-									MountPath: "/tmp/nvidia-mps-log",
-								},
-								Env: []corev1.EnvVar{
-									{
-										Name:  "CUDA_MPS_PIPE_DIRECTORY",
-										Value: "/tmp/nvidia-mps",
-									},
-									{
-										Name:  "CUDA_MPS_LOG_DIRECTORY",
-										Value: "/tmp/nvidia-mps-log",
-									},
-								},
-								{
-									Name:      "servingconfig",
-									MountPath: "/home/client_serving.py",
-									SubPath:   "client_serving.py",
-								},
-									Name:      "servingconfig",
-									MountPath: "/home/task.py",
-									SubPath:   "task.py",
-								},
-								{
-									Name:      "servingconfig",
-									MountPath: "/home/client_serving_config.yaml",
-									SubPath:   "client_serving_config.yaml",
-								},
-								{
-									Name:      "modelstorage",
-									MountPath: "/home/model",
-								},
-								{
-									Name:      "run",
-									MountPath: "/run",
-								},
-								{
-									Name:      "varrun",
-									MountPath: "/var/run",
-								},
-								{
-									Name:      "dev",
-									MountPath: "/dev",
-								},
+							VolumeMounts: []corev1.VolumeMount{
+								{ Name: "mpspipe", MountPath: "/tmp/nvidia-mps" },
+								{ Name: "mpslog", MountPath: "/tmp/nvidia-mps-log" },
+								{ Name: "servingconfig", MountPath: "/home/client_serving.py", SubPath: "client_serving.py" },
+								{ Name: "servingconfig", MountPath: "/home/task.py", SubPath: "task.py" },
+								{ Name: "servingconfig", MountPath: "/home/client_serving_config.yaml", SubPath: "client_serving_config.yaml" },
+								{ Name: "modelstorage", MountPath: "/home/model" },
+								{ Name: "run", MountPath: "/run" },
+								{ Name: "varrun", MountPath: "/var/run" },
+								{ Name: "dev", MountPath: "/dev" },
+							},
+							Env: []corev1.EnvVar{
+								{ Name: "CUDA_MPS_PIPE_DIRECTORY", Value: "/tmp/nvidia-mps" },
+								{ Name: "CUDA_MPS_LOG_DIRECTORY", Value: "/tmp/nvidia-mps-log" },
 							},
 							SecurityContext: &corev1.SecurityContext{
 								Privileged: func(b bool) *bool { return &b }(true),
