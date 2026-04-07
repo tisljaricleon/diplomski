@@ -16,7 +16,6 @@ from jtop import jtop
 import asyncio
 import time
 
-# Jtop stats monitoring & logging
 latest_stats = {}
 def monitor_jtop():
     try:

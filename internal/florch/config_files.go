@@ -113,7 +113,14 @@ func BuildLocalAggregatorServingConfigFiles() (map[string]string, error) {
 }
 
 func BuildClientServingConfigFiles() (map[string]string, error) {
-	buildImagesPath := "../../internal/build_images/client_serving/"
+	configDirectoryPath := "../../configs/fl/"
+	buildImagesPath := "../../internal/build_images/client/"
+
+	taskBytesArray, err := os.ReadFile(fmt.Sprint(configDirectoryPath, "task/task.py"))
+	if err != nil {
+		fmt.Print(err)
+	}
+	taskString := string(taskBytesArray)
 
 	servingpyBytesArray, err := os.ReadFile(fmt.Sprint(buildImagesPath, "client_serving.py"))
 	if err != nil {
@@ -124,6 +131,7 @@ func BuildClientServingConfigFiles() (map[string]string, error) {
 	clientServingConfig := ClientServingConfig_Yaml
 
 	filesData := map[string]string{
+		"task.py":            taskString,
 		"client_serving.py":         servingpyString,
 		"client_serving_config.yaml": clientServingConfig,
 	}
@@ -140,9 +148,9 @@ server:
 strategy:
   fraction_fit: 1.0
   fraction_evaluate: 1.0
-  min_fit_clients: 3
-  min_evaluate_clients: 3
-  min_available_clients: 3
+  min_fit_clients: 5
+  min_evaluate_clients: 5
+  min_available_clients: 5
 `
 
 const LocalAggregatorConfig_Yaml = `

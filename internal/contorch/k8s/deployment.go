@@ -2,7 +2,6 @@ package k8sorch
 
 import (
 	"fmt"
-
 	"github.com/AIoTwin-Adaptive-FL-Orch/fl-orchestrator/internal/common"
 	"github.com/AIoTwin-Adaptive-FL-Orch/fl-orchestrator/internal/model"
 	appsv1 "k8s.io/api/apps/v1"
@@ -12,7 +11,7 @@ import (
 )
 
 func BuildGlobalAggregatorDeployment(aggregator *model.FlAggregator, namespace string) *appsv1.Deployment {
-       deployment := &appsv1.Deployment{
+	deployment := &appsv1.Deployment{
 	       ObjectMeta: metav1.ObjectMeta{
 		       Name:      common.GetGlobalAggregatorDeploymentName(aggregator.Id),
 		       Namespace: namespace,
@@ -39,7 +38,25 @@ func BuildGlobalAggregatorDeployment(aggregator *model.FlAggregator, namespace s
 									ContainerPort: aggregator.Port,
 								},
 							},
-							VolumeMounts: []corev1.VolumeMount{
+							   VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "mpspipe",
+									MountPath: "/tmp/nvidia-mps",
+								},
+								{
+									Name:      "mpslog",
+									MountPath: "/tmp/nvidia-mps-log",
+								},
+								Env: []corev1.EnvVar{
+									{
+										Name:  "CUDA_MPS_PIPE_DIRECTORY",
+										Value: "/tmp/nvidia-mps",
+									},
+									{
+										Name:  "CUDA_MPS_LOG_DIRECTORY",
+										Value: "/tmp/nvidia-mps-log",
+									},
+								},
 								{
 									Name:      "gaconfig",
 									MountPath: "/home/task.py",
@@ -72,7 +89,23 @@ func BuildGlobalAggregatorDeployment(aggregator *model.FlAggregator, namespace s
 							},
 						},
 					},
-					Volumes: []corev1.Volume{
+					   Volumes: []corev1.Volume{
+						{
+							Name: "mpspipe",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/tmp/nvidia-mps",
+								},
+							},
+						},
+						{
+							Name: "mpslog",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/tmp/nvidia-mps-log",
+								},
+							},
+						},
 						{
 							Name: "gaconfig",
 							VolumeSource: corev1.VolumeSource{
@@ -129,7 +162,25 @@ func BuildLocalAggregatorDeployment(aggregator *model.FlAggregator, namespace st
 									ContainerPort: aggregator.Port,
 								},
 							},
-							VolumeMounts: []corev1.VolumeMount{
+							   VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "mpspipe",
+									MountPath: "/tmp/nvidia-mps",
+								},
+								{
+									Name:      "mpslog",
+									MountPath: "/tmp/nvidia-mps-log",
+								},
+								Env: []corev1.EnvVar{
+									{
+										Name:  "CUDA_MPS_PIPE_DIRECTORY",
+										Value: "/tmp/nvidia-mps",
+									},
+									{
+										Name:  "CUDA_MPS_LOG_DIRECTORY",
+										Value: "/tmp/nvidia-mps-log",
+									},
+								},
 								{
 									Name:      "laconfig",
 									MountPath: "/home/local_server_config.yaml",
@@ -152,7 +203,23 @@ func BuildLocalAggregatorDeployment(aggregator *model.FlAggregator, namespace st
 							},
 						},
 					},
-					Volumes: []corev1.Volume{
+					   Volumes: []corev1.Volume{
+						{
+							Name: "mpspipe",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/tmp/nvidia-mps",
+								},
+							},
+						},
+						{
+							Name: "mpslog",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/tmp/nvidia-mps-log",
+								},
+							},
+						},
 						{
 							Name: "laconfig",
 							VolumeSource: corev1.VolumeSource{
@@ -204,7 +271,25 @@ func BuildClientDeployment(client *model.FlClient, namespace string) *appsv1.Dep
 						{
 							Name:  "fl-client",
 							Image: common.FL_CLIENT_IMAGE,
-							VolumeMounts: []corev1.VolumeMount{
+							   VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "mpspipe",
+									MountPath: "/tmp/nvidia-mps",
+								},
+								{
+									Name:      "mpslog",
+									MountPath: "/tmp/nvidia-mps-log",
+								},
+								Env: []corev1.EnvVar{
+									{
+										Name:  "CUDA_MPS_PIPE_DIRECTORY",
+										Value: "/tmp/nvidia-mps",
+									},
+									{
+										Name:  "CUDA_MPS_LOG_DIRECTORY",
+										Value: "/tmp/nvidia-mps-log",
+									},
+								},
 								{
 									Name:      "clientconfig",
 									MountPath: "/home/task.py",
@@ -237,7 +322,23 @@ func BuildClientDeployment(client *model.FlClient, namespace string) *appsv1.Dep
 							},
 						},
 					},
-					Volumes: []corev1.Volume{
+					   Volumes: []corev1.Volume{
+						{
+							Name: "mpspipe",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/tmp/nvidia-mps",
+								},
+							},
+						},
+						{
+							Name: "mpslog",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/tmp/nvidia-mps-log",
+								},
+							},
+						},
 						{
 							Name: "clientconfig",
 							VolumeSource: corev1.VolumeSource{
@@ -293,7 +394,25 @@ func BuildGlobalAggregatorServingDeployment(aggregator *model.FlAggregator, name
 								{ ContainerPort: common.GLOBAL_AGGREGATOR_SERVING_PORT },
 								
 							},
-							VolumeMounts: []corev1.VolumeMount{
+							   VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "mpspipe",
+									MountPath: "/tmp/nvidia-mps",
+								},
+								{
+									Name:      "mpslog",
+									MountPath: "/tmp/nvidia-mps-log",
+								},
+								Env: []corev1.EnvVar{
+									{
+										Name:  "CUDA_MPS_PIPE_DIRECTORY",
+										Value: "/tmp/nvidia-mps",
+									},
+									{
+										Name:  "CUDA_MPS_LOG_DIRECTORY",
+										Value: "/tmp/nvidia-mps-log",
+									},
+								},
 								{
 									Name:      "servingconfig",
 									MountPath: "/home/global_server_serving_config.yaml",
@@ -317,7 +436,23 @@ func BuildGlobalAggregatorServingDeployment(aggregator *model.FlAggregator, name
 							},
 						},
 					},
-					Volumes: []corev1.Volume{
+					   Volumes: []corev1.Volume{
+						{
+							Name: "mpspipe",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/tmp/nvidia-mps",
+								},
+							},
+						},
+						{
+							Name: "mpslog",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/tmp/nvidia-mps-log",
+								},
+							},
+						},
 						{
 							Name: "servingconfig",
 							VolumeSource: corev1.VolumeSource{
@@ -373,11 +508,33 @@ func BuildClientServingDeployment(client *model.FlClient, namespace string) *app
 								{ ContainerPort: common.FL_CLIENT_SERVING_PORT },
 								
 							},
-							VolumeMounts: []corev1.VolumeMount{
+							   VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "mpspipe",
+									MountPath: "/tmp/nvidia-mps",
+								},
+								{
+									Name:      "mpslog",
+									MountPath: "/tmp/nvidia-mps-log",
+								},
+								Env: []corev1.EnvVar{
+									{
+										Name:  "CUDA_MPS_PIPE_DIRECTORY",
+										Value: "/tmp/nvidia-mps",
+									},
+									{
+										Name:  "CUDA_MPS_LOG_DIRECTORY",
+										Value: "/tmp/nvidia-mps-log",
+									},
+								},
 								{
 									Name:      "servingconfig",
 									MountPath: "/home/client_serving.py",
 									SubPath:   "client_serving.py",
+								},
+									Name:      "servingconfig",
+									MountPath: "/home/task.py",
+									SubPath:   "task.py",
 								},
 								{
 									Name:      "servingconfig",
@@ -416,7 +573,23 @@ func BuildClientServingDeployment(client *model.FlClient, namespace string) *app
 							},
 						},
 					},
-					Volumes: []corev1.Volume{
+					   Volumes: []corev1.Volume{
+						{
+							Name: "mpspipe",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/tmp/nvidia-mps",
+								},
+							},
+						},
+						{
+							Name: "mpslog",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/tmp/nvidia-mps-log",
+								},
+							},
+						},
 						{
 							Name: "servingconfig",
 							VolumeSource: corev1.VolumeSource{
