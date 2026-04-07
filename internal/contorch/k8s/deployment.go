@@ -29,6 +29,7 @@ func BuildGlobalAggregatorDeployment(aggregator *model.FlAggregator, namespace s
 					},
 				},
 				Spec: corev1.PodSpec{
+					HostIPC: true,
 					Containers: []corev1.Container{
 						{
 							Name:  "fl-ga",
@@ -126,6 +127,7 @@ func BuildLocalAggregatorDeployment(aggregator *model.FlAggregator, namespace st
 					},
 				},
 				Spec: corev1.PodSpec{
+					HostIPC: true,
 					Containers: []corev1.Container{
 						{
 							Name:  "fl-la",
@@ -221,6 +223,7 @@ func BuildClientDeployment(client *model.FlClient, namespace string) *appsv1.Dep
 					},
 				},
 				Spec: corev1.PodSpec{
+					HostIPC: true,
 					Containers: []corev1.Container{
 						{
 							Name:  "fl-client",
@@ -313,6 +316,7 @@ func BuildGlobalAggregatorServingDeployment(aggregator *model.FlAggregator, name
 					},
 				},
 				Spec: corev1.PodSpec{
+					HostIPC: true,
 					Containers: []corev1.Container{
 						{
 							Name:  "fl-serving",
@@ -407,6 +411,7 @@ func BuildClientServingDeployment(client *model.FlClient, namespace string) *app
 					},
 				},
 				Spec: corev1.PodSpec{
+					HostIPC: true,
 					Containers: []corev1.Container{
 						{
 							Name:  "fl-serving",

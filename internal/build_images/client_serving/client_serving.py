@@ -75,7 +75,7 @@ threading.Thread(target=monitor_jtop, daemon=True).start()
 threading.Thread(target=log_resource_usage, daemon=True).start()
 
 
-# Defining device, transforms, Net
+
 cuda_available = torch.cuda.is_available()
 device = torch.device("cuda:0" if cuda_available else "cpu")
 cifar10_transform = transforms.Compose([
