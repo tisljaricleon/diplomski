@@ -137,7 +137,7 @@ app = FastAPI()
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
-    import os
+    import os, time
     print(f"[PID {os.getpid()}] Received request")
     global model
     try:
@@ -148,7 +148,10 @@ async def predict(file: UploadFile = File(...)):
         image = Image.open(io.BytesIO(await file.read())).convert("RGB")
         tensor = cifar10_transform(image).unsqueeze(0)
         tensor = tensor.to(device)
+        start = time.time()
         prediction = await asyncio.to_thread(inference, tensor)
+        end = time.time()
+        print(f"[PID {os.getpid()}] Inference time: {end - start:.4f} seconds")
         return JSONResponse({"label": int(prediction)})
     except Exception as e:
         return JSONResponse({ "label": None, "error": str(e)}, status_code=500)
