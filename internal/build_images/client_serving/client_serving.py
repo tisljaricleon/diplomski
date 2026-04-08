@@ -133,9 +133,12 @@ def inference(tensor):
         return output.argmax(dim=1).item()
 
 
-app = FastAPI()          
+app = FastAPI()
+
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
+    import os
+    print(f"[PID {os.getpid()}] Received request")
     global model
     try:
         if model is None:
