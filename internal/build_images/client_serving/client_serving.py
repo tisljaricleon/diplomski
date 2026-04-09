@@ -1,13 +1,4 @@
 import traceback
-import psutil
-def log_memory(prefix=""):
-    try:
-        print(f"[MEMORY] {prefix} CPU: {psutil.virtual_memory().percent}% used")
-        if torch.cuda.is_available():
-            print(f"[MEMORY] {prefix} CUDA allocated: {torch.cuda.memory_allocated()} reserved: {torch.cuda.memory_reserved()}")
-    except Exception as e:
-        print(f"[MEMORY LOGGING ERROR] {e}")
-        traceback.print_exc()
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 from PIL import Image
@@ -27,7 +18,6 @@ import time
 from typing import List
 import datetime
 
-
 latest_stats = {}
 def monitor_jtop():
     try:
@@ -40,9 +30,9 @@ def monitor_jtop():
 
 def log_resource_usage():
     stat_fields = [
-        'timestamp', 'cpu1', 'cpu2', 'cpu3', 'cpu4', 'cpu5', 'cpu6', 'gpu', 'ram', 'swap',
+        'timestamp', 'cpu1', 'cpu2', 'cpu3', 'cpu4', 'cpu5', 'cpu6', 'gpu','gpu_allocated_mem', 'ram', 'swap',
         'fan', 'temp_cpu', 'temp_gpu', 'temp_soc0', 'temp_soc1', 'temp_soc2', 'temp_therm_junction',
-        'power_vdd_cpu_gpu_cv', 'power_vdd_soc', 'power_tot', 'jetson_clocks', 'nvp_model'
+        'power_vdd_cpu_gpu_cv', 'power_vdd_soc', 'power_tot', 'jetson_clocks', 'nvp_model',
     ]
     log_path = "/home/model/resource_log.csv"
 
@@ -60,6 +50,7 @@ def log_resource_usage():
             latest_stats.get('CPU5', ''),
             latest_stats.get('CPU6', ''),
             latest_stats.get('GPU', ''),
+            torch.cuda.memory_allocated() if torch.cuda.is_available() else '',
             latest_stats.get('RAM', ''),
             latest_stats.get('SWAP', ''),
             latest_stats.get('Fan pwmfan0', ''),
@@ -81,7 +72,7 @@ def log_resource_usage():
             if not file_exists:
                 writer.writerow(stat_fields)
             writer.writerow(row)
-        time.sleep(0.5)
+        time.sleep(0.25)
 
 threading.Thread(target=monitor_jtop, daemon=True).start()
 threading.Thread(target=log_resource_usage, daemon=True).start()
@@ -115,7 +106,6 @@ class Net(nn.Module):
         return self.fc3(x)
 
 
-# Model loading
 def load_model():
     model_path = "/home/model/model.pt"
     if not os.path.exists(model_path):
@@ -135,6 +125,19 @@ def load_model():
         return None
 
 
+def wait_for_free_gpu(min_free_bytes, timeout=10):
+    if not torch.cuda.is_available():
+        return True
+    
+    start = time.time()
+    while time.time() - start < timeout:
+        free = torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_allocated(0)
+        if free > min_free_bytes:
+            return True
+        time.sleep(0.05)
+    return False
+
+
 model = load_model()
 
 LABEL_NAMES = [
@@ -149,47 +152,57 @@ def inference(tensor):
         return preds.cpu().numpy(), output.cpu().numpy()
 
 
-app = FastAPI()          
-
+app = FastAPI()
 @app.post("/predict")
 async def predict(files: List[UploadFile] = File(...)):
     global model
     try:
-        log_memory("BEFORE INFERENCE")
         if model is None:
             model = load_model()
-            if model is None:
-                print("[PREDICT ERROR] Model not found")
-                return JSONResponse({"labels": None, "error": "Model not found"}, status_code=404)
+        if model is None:
+            print("[PREDICT] Model not found")
+            return JSONResponse({"results": None, "error": "Model not found"}, status_code=404)
+        
         images = []
         for file in files:
             image = Image.open(io.BytesIO(await file.read())).convert("RGB")
             tensor = cifar10_transform(image)
             images.append(tensor)
         batch_tensor = torch.stack(images).to(device)
+
+        min_free_bytes = batch_tensor.element_size() * batch_tensor.nelement() * 2
+        if not wait_for_free_gpu(min_free_bytes):
+            print("[PREDICT] Not enough free GPU memory")
+            return JSONResponse({"results": None, "error": "Server busy, not enough GPU memory"}, status_code=503)
+
         start_time = time.time()
-        print(f"[TIMING] Inference start: {datetime.datetime.now().isoformat()}")
+        print(f"[PREDICT] Inference start: {datetime.datetime.now().isoformat()}")
         preds, logits = await asyncio.to_thread(inference, batch_tensor)
         end_time = time.time()
-        print(f"[TIMING] Inference end: {datetime.datetime.now().isoformat()} | Duration: {end_time - start_time:.4f} seconds")
-        log_memory("AFTER INFERENCE")
+        print(f"[PREDICT] Inference end: {datetime.datetime.now().isoformat()}, duration: {end_time - start_time:.4f} seconds")
+
+
+        probs = torch.nn.functional.softmax(torch.from_numpy(logits), dim=1).numpy()
         results = []
         for idx in range(len(preds)):
             label_idx = int(preds[idx])
             label_name = LABEL_NAMES[label_idx]
+            confidence = float(probs[idx][label_idx])
             results.append({
                 "label_index": label_idx,
-                "label_name": label_name
+                "label_name": label_name,
+                "confidence": confidence
             })
-        return JSONResponse({"results": results, "accuracy": None})
+        return JSONResponse({"results": results}, status_code=200)
+    
     except Exception as e:
-        print(f"[PREDICT ERROR] {e}")
+        print(f"[PREDICT] {e}")
         traceback.print_exc()
-        return JSONResponse({ "labels": None, "error": str(e)}, status_code=500)
+        return JSONResponse({ "results": None, "error": str(e)}, status_code=500)
 
-# Global exception handler for FastAPI
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     print(f"[GLOBAL EXCEPTION] {exc}")
     traceback.print_exc()
-    return JSONResponse({"detail": str(exc)}, status_code=500)
+    return JSONResponse({"results": None, "error": str(exc)}, status_code=500)
