@@ -45,9 +45,10 @@ def log_resource_usage():
     ]
     log_path = "/home/model/resource_log.csv"
 
-    if os.path.exists(log_path):
+    if not os.path.exists(log_path):
         with open(log_path, 'w', newline='') as file:
-            pass
+            writer = csv.writer(file)
+            writer.writerow(stat_fields)
 
     while True:
         gpu_mem = torch.cuda.memory_allocated() if torch.cuda.is_available() else ''
@@ -80,11 +81,8 @@ def log_resource_usage():
             latest_stats.get('jetson_clocks', ''),
             latest_stats.get('nvp model', ''),
         ]
-        file_exists = os.path.exists(log_path)
         with open(log_path, 'a', newline='') as file:
             writer = csv.writer(file)
-            if not file_exists:
-                writer.writerow(stat_fields)
             writer.writerow(row)
         time.sleep(0.25)
 
