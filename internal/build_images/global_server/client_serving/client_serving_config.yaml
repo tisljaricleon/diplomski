@@ -1,5 +1,0 @@
-server:
-  address: "0.0.0.0:8000"
-
-model:
-  name: "model.pt"
