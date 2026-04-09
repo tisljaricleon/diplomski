@@ -1,0 +1,5 @@
+flwr==1.7.0
+flwr_datasets
+numpy
+pyyaml
+pillow
