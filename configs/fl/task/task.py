@@ -105,8 +105,9 @@ def train(net, trainloader, valloader, epochs, learning_rate, device):
         running_loss = 0.0
 
         for batch in trainloader:
-            images = batch["img"].to(device)
-            labels = batch["label"].to(device)
+            images, labels = batch
+            images = images.to(device)
+            labels = labels.to(device)
 
             optimizer.zero_grad()
             outputs = net(images)
@@ -138,8 +139,9 @@ def test(net, testloader, device):
 
     with torch.no_grad():
         for batch in testloader:
-            images = batch["img"].to(device)
-            labels = batch["label"].to(device)
+            images, labels = batch
+            images = images.to(device)
+            labels = labels.to(device)
 
             outputs = net(images)
             loss = criterion(outputs, labels)
