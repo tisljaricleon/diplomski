@@ -158,7 +158,7 @@ server:
   global_address: "%[1]s"
   local_address: "0.0.0.0:8080"
   local_rounds: %[2]s
-  global_rounds: 20
+  global_rounds: 40
 
 strategy:
   fraction_fit: 1.0

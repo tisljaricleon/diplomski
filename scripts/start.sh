@@ -5,7 +5,7 @@ curl -X POST http://10.19.4.45:8080/fl/start \
     "localRounds": 1,
     "trainingParams": {
       "batchSize": 32,
-      "learningRate": 0.01
+      "learningRate": 0.001
     },
     "modelSize": 1.0,
     "costSource": "communication",
