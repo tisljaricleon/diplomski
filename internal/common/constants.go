@@ -1,7 +1,7 @@
 package common
 
 // Container images
-const FL_CLIENT_IMAGE = "leontisljaric/hfl-client:0.1"
+const FL_CLIENT_IMAGE = "leontisljaric/hfl-client:0.2"
 const LOCAL_AGGRETATOR_IMAGE = "cilicivan96/hfl-local-server:0.2"
 const GLOBAL_AGGRETATOR_IMAGE = "leontisljaric/hfl-global-server:0.2"
 
