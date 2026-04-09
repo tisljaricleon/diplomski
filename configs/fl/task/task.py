@@ -5,9 +5,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset, random_split
 from torchvision.transforms import Compose, Normalize, ToTensor
-from flwr_datasets import FederatedDataset
-from flwr_datasets.partitioner import IidPartitioner
+from torchvision.datasets import CIFAR10
 
 
 class Net(nn.Module):
@@ -59,67 +59,48 @@ def save_model(net, model_path):
     logging.info(f"[SAVE MODEL] Model saved to {model_path}")
     
 
+def load_data(partition_id: int, num_partitions: int, batch_size: int, num_workers: int = 4, pin_memory: bool = True):
+    transform = Compose([
+        ToTensor(),
+        Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
 
-fds = None  # Cache FederatedDataset
+    full_dataset = CIFAR10(root="./dataset", train=True, download=True, transform=transform)
+    full_dataset = Subset(full_dataset, range(10000))
+    total_size = len(full_dataset)
 
+    partition_size = total_size // num_partitions
+    start_idx = partition_id * partition_size
+    end_idx = start_idx + partition_size
+    indices = list(range(start_idx, end_idx))
 
-def load_data(partition_id: int, num_partitions: int, batch_size: int):
-    """Load partition CIFAR10 data."""
-    # Only initialize `FederatedDataset` once
-    global fds
-    if fds is None:
-        partitioner = IidPartitioner(num_partitions=num_partitions)
-        fds = FederatedDataset(
-            dataset="uoft-cs/cifar10",
-            partitioners={"train": partitioner},
-        )
-    partition = fds.load_partition(partition_id)
-    # Divide data on each node: 80% train, 20% test
-    partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
-    pytorch_transforms = Compose(
-        [ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
-    )
+    partition_dataset = Subset(full_dataset, indices)
 
-    def apply_transforms(batch):
-        """Apply transforms to the partition from FederatedDataset."""
-        batch["img"] = [pytorch_transforms(img) for img in batch["img"]]
-        return batch
+    train_size = int(0.8 * len(partition_dataset))
+    test_size = len(partition_dataset) - train_size
+    train_subset, test_subset = random_split(partition_dataset, [train_size, test_size], generator=torch.Generator().manual_seed(42))
 
-    partition_train_test = partition_train_test.with_transform(apply_transforms)
-    trainloader = DataLoader(
-        partition_train_test["train"], batch_size=batch_size, shuffle=True
-    )
-    testloader = DataLoader(partition_train_test["test"], batch_size=batch_size)
+    trainloader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=pin_memory)
+    testloader = DataLoader(test_subset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=pin_memory)
+
     return trainloader, testloader
+
+
 
 
 def train(net, trainloader, valloader, epochs, learning_rate, device):
     """Train the model on the training set."""
-    net.to(device)
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9, weight_decay=5e-4)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)  # Optional: reduce LR every 20 epochs
-
+    net.to(device)  # move model to GPU if available
+    criterion = torch.nn.CrossEntropyLoss().to(device)
+    optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9)
+    net.train()
     for epoch in range(epochs):
-        net.train()
-        running_loss = 0.0
-
+        print(f"[Local Training] Epoch {epoch+1}/{epochs}")
         for batch in trainloader:
             images, labels = batch
-            images = images.to(device)
-            labels = labels.to(device)
-
             optimizer.zero_grad()
-            outputs = net(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
+            criterion(net(images.to(device)), labels.to(device)).backward()
             optimizer.step()
-
-            running_loss += loss.item()
-
-        scheduler.step()
-
-        print(f"Epoch {epoch+1}/{epochs}, Loss: {running_loss/len(trainloader):.4f}")
 
     val_loss, val_acc = test(net, valloader, device)
 
@@ -132,25 +113,17 @@ def train(net, trainloader, valloader, epochs, learning_rate, device):
 
 def test(net, testloader, device):
     """Validate the model on the test set."""
-    net.to(device)
-    net.eval()
+    net.to(device)  # move model to GPU if available
     criterion = torch.nn.CrossEntropyLoss()
-    correct, total, total_loss = 0, 0, 0.0
-
+    correct, loss = 0, 0.0
     with torch.no_grad():
         for batch in testloader:
             images, labels = batch
             images = images.to(device)
             labels = labels.to(device)
-
             outputs = net(images)
-            loss = criterion(outputs, labels)
-
-            total_loss += loss.item()
-            _, predicted = outputs.max(1)
-            correct += predicted.eq(labels).sum().item()
-            total += labels.size(0)
-
-    accuracy = correct / total
-    avg_loss = total_loss / len(testloader)
-    return avg_loss, accuracy
+            loss += criterion(outputs, labels).item()
+            correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
+    accuracy = correct / len(testloader.dataset)
+    loss = loss / len(testloader)
+    return loss, accuracy
