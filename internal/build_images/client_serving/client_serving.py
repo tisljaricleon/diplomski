@@ -9,6 +9,7 @@ import yaml
 from torchvision import transforms
 import torch.nn as nn
 import torch.nn.functional as F
+
 import threading
 import csv
 import datetime
@@ -17,6 +18,10 @@ import asyncio
 import time
 from typing import List
 import datetime
+
+
+last_request_gpu_mem = 0
+last_request_gpu_mem_max = 0
 
 latest_stats = {}
 def monitor_jtop():
@@ -28,9 +33,13 @@ def monitor_jtop():
         print(f"[JTOP MONITOR] Error: {e}")
 
 
+
 def log_resource_usage():
+    global last_request_gpu_mem, last_request_gpu_mem_max
     stat_fields = [
-        'timestamp', 'cpu1', 'cpu2', 'cpu3', 'cpu4', 'cpu5', 'cpu6', 'gpu','gpu_allocated_mem', 'ram', 'swap',
+        'timestamp', 'cpu1', 'cpu2', 'cpu3', 'cpu4', 'cpu5', 'cpu6', 'gpu',
+        'gpu_allocated_mem', 'gpu_request_mem', 'gpu_request_mem_max', 'gpu_total_mem',
+        'ram', 'swap',
         'fan', 'temp_cpu', 'temp_gpu', 'temp_soc0', 'temp_soc1', 'temp_soc2', 'temp_therm_junction',
         'power_vdd_cpu_gpu_cv', 'power_vdd_soc', 'power_tot', 'jetson_clocks', 'nvp_model',
     ]
@@ -41,6 +50,8 @@ def log_resource_usage():
             pass
 
     while True:
+        gpu_mem = torch.cuda.memory_allocated() if torch.cuda.is_available() else ''
+        gpu_total = torch.cuda.get_device_properties(0).total_memory if torch.cuda.is_available() else ''
         row = [
             datetime.datetime.now().isoformat(),
             latest_stats.get('CPU1', ''),
@@ -50,7 +61,10 @@ def log_resource_usage():
             latest_stats.get('CPU5', ''),
             latest_stats.get('CPU6', ''),
             latest_stats.get('GPU', ''),
-            torch.cuda.memory_allocated() if torch.cuda.is_available() else '',
+            gpu_mem,
+            last_request_gpu_mem,
+            last_request_gpu_mem_max,
+            gpu_total,
             latest_stats.get('RAM', ''),
             latest_stats.get('SWAP', ''),
             latest_stats.get('Fan pwmfan0', ''),
@@ -153,16 +167,17 @@ def inference(tensor):
 
 
 app = FastAPI()
+
 @app.post("/predict")
 async def predict(files: List[UploadFile] = File(...)):
-    global model
+    global model, last_request_gpu_mem, last_request_gpu_mem_max
     try:
         if model is None:
             model = load_model()
         if model is None:
             print("[PREDICT] Model not found")
             return JSONResponse({"results": None, "error": "Model not found"}, status_code=404)
-        
+
         images = []
         for file in files:
             image = Image.open(io.BytesIO(await file.read())).convert("RGB")
@@ -175,12 +190,19 @@ async def predict(files: List[UploadFile] = File(...)):
             print("[PREDICT] Not enough free GPU memory")
             return JSONResponse({"results": None, "error": "Server busy, not enough GPU memory"}, status_code=503)
 
+        mem_before = torch.cuda.memory_allocated() if torch.cuda.is_available() else 0
+        mem_max_before = torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0
+
         start_time = time.time()
         print(f"[PREDICT] Inference start: {datetime.datetime.now().isoformat()}")
         preds, logits = await asyncio.to_thread(inference, batch_tensor)
         end_time = time.time()
         print(f"[PREDICT] Inference end: {datetime.datetime.now().isoformat()}, duration: {end_time - start_time:.4f} seconds")
 
+        mem_after = torch.cuda.memory_allocated() if torch.cuda.is_available() else 0
+        mem_max_after = torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0
+        last_request_gpu_mem = mem_after - mem_before
+        last_request_gpu_mem_max = mem_max_after - mem_max_before
 
         probs = torch.nn.functional.softmax(torch.from_numpy(logits), dim=1).numpy()
         results = []
@@ -194,7 +216,6 @@ async def predict(files: List[UploadFile] = File(...)):
                 "confidence": confidence
             })
         return JSONResponse({"results": results}, status_code=200)
-    
     except Exception as e:
         print(f"[PREDICT] {e}")
         traceback.print_exc()
