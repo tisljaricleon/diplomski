@@ -6,7 +6,7 @@ const LOCAL_AGGRETATOR_IMAGE = "cilicivan96/hfl-local-server:0.2"
 const GLOBAL_AGGRETATOR_IMAGE = "leontisljaric/hfl-global-server:0.3"
 
 const GLOBAL_AGGREGATOR_SERVING_IMAGE = "leontisljaric/hfl-serving:0.1"
-const CLIENT_SERVING_IMAGE = "leontisljaric/hfl-serving:0.2"
+const CLIENT_SERVING_IMAGE = "leontisljaric/hfl-serving:0.3"
 const LOCAL_AGGREGATOR_SERVING_IMAGE = "leontisljaric/hfl-serving:0.1"
 
 // FL Client configs
