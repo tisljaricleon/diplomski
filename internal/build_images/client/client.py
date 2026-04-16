@@ -59,7 +59,8 @@ class FlowerClient(fl.client.NumPyClient):
         )
         round_duration = time.time() - round_start
 
-        model_path = "/home/model/model.pt"
+        model_path = "/home/model/model_resnet18.pt"
+        
         save_model(self.net, model_path)
 
         logging.info(f"[Client {self.partition_id}] Global round {local_round} ended in {round_duration:.2f}s")
