@@ -36,7 +36,7 @@ class FlowerClient(fl.client.NumPyClient):
         self.lr = learning_rate
         self.partition_id = partition_id
 
-        model_path = "/home/model/model.pt"
+        model_path = "/home/model/model_resnet18.pt"
         self.net = load_model(model_path, self.device)
 
 
