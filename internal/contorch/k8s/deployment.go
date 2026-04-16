@@ -438,15 +438,13 @@ func BuildClientServingDeployment(client *model.FlClient, namespace string) *app
 							SecurityContext: &corev1.SecurityContext{
 								Privileged: func(b bool) *bool { return &b }(true),
 							},
-							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("0.2"),
-									corev1.ResourceMemory: resource.MustParse("256Mi"),
-								},
-								Limits: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("1.0"),
-									corev1.ResourceMemory: resource.MustParse("1Gi"),
-								},
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1.0"),
+								corev1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("4.0"),
+								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},
 						},
 					},
