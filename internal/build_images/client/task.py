@@ -1,5 +1,6 @@
 import os
 import logging
+import time
 from collections import OrderedDict
 import torch
 import torch.nn as nn
@@ -87,19 +88,27 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int, num_worke
 
 
 
-def train(net, trainloader, valloader, epochs, learning_rate, device):
+def train(net, trainloader, valloader, epochs, learning_rate, device, global_round=None, log_fn=None):
     """Train the model on the training set."""
     net.to(device)  # move model to GPU if available
     criterion = torch.nn.CrossEntropyLoss().to(device)
     optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9)
     net.train()
-    for _ in range(epochs):
+    for epoch in range(epochs):
+        epoch_start = time.time()
+        logging.info(f"[Local Training] Epoch {epoch+1}/{epochs} started")
+        if log_fn:
+            log_fn("EPOCH_START", global_round=global_round, local_epoch=epoch+1)
         for batch in trainloader:
             images = batch["img"]
             labels = batch["label"]
             optimizer.zero_grad()
             criterion(net(images.to(device)), labels.to(device)).backward()
             optimizer.step()
+        epoch_duration = time.time() - epoch_start
+        logging.info(f"[Local Training] Epoch {epoch+1}/{epochs} ended in {epoch_duration:.2f}s")
+        if log_fn:
+            log_fn("EPOCH_END", global_round=global_round, local_epoch=epoch+1, duration=round(epoch_duration, 2))
 
     val_loss, val_acc = test(net, valloader, device)
 

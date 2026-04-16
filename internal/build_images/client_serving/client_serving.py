@@ -17,28 +17,28 @@ from jtop import jtop
 import asyncio
 import time
 from typing import List
-import datetime
 
-
-last_request_gpu_mem = 0
-last_request_gpu_mem_max = 0
 
 latest_stats = {}
 def monitor_jtop():
     try:
         with jtop() as jetson:
+            # Print available keys once so we know what jtop provides
+            first = True
             while jetson.ok():
                 latest_stats.update(jetson.stats)
+                if first:
+                    print(f"[JTOP KEYS] {list(jetson.stats.keys())}")
+                    first = False
     except Exception as e:
         print(f"[JTOP MONITOR] Error: {e}")
 
 
 
 def log_resource_usage():
-    global last_request_gpu_mem, last_request_gpu_mem_max
     stat_fields = [
-        'timestamp', 'cpu1', 'cpu2', 'cpu3', 'cpu4', 'cpu5', 'cpu6', 'gpu',
-        'gpu_allocated_mem', 'gpu_request_mem', 'gpu_request_mem_max', 'gpu_total_mem',
+        'timestamp', 'cpu1', 'cpu2', 'cpu3', 'cpu4', 'cpu5', 'cpu6',
+        'gpu_util', 'gpu_allocated_mem', 'gpu_total_mem',
         'ram', 'swap',
         'fan', 'temp_cpu', 'temp_gpu', 'temp_soc0', 'temp_soc1', 'temp_soc2', 'temp_therm_junction',
         'power_vdd_cpu_gpu_cv', 'power_vdd_soc', 'power_tot', 'jetson_clocks', 'nvp_model',
@@ -53,6 +53,10 @@ def log_resource_usage():
     while True:
         gpu_mem = torch.cuda.memory_allocated() if torch.cuda.is_available() else ''
         gpu_total = torch.cuda.get_device_properties(0).total_memory if torch.cuda.is_available() else ''
+        # Get GPU utilization - jtop may return it as int or dict
+        gpu_val = latest_stats.get('GPU', '')
+        if isinstance(gpu_val, dict):
+            gpu_val = gpu_val.get('val', gpu_val.get('cur', ''))
         row = [
             datetime.datetime.now().isoformat(),
             latest_stats.get('CPU1', ''),
@@ -61,10 +65,8 @@ def log_resource_usage():
             latest_stats.get('CPU4', ''),
             latest_stats.get('CPU5', ''),
             latest_stats.get('CPU6', ''),
-            latest_stats.get('GPU', ''),
+            gpu_val,
             gpu_mem,
-            last_request_gpu_mem,
-            last_request_gpu_mem_max,
             gpu_total,
             latest_stats.get('RAM', ''),
             latest_stats.get('SWAP', ''),
@@ -90,6 +92,7 @@ threading.Thread(target=monitor_jtop, daemon=True).start()
 threading.Thread(target=log_resource_usage, daemon=True).start()
 
 
+# 
 
 cuda_available = torch.cuda.is_available()
 device = torch.device("cuda:0" if cuda_available else "cpu")
@@ -137,8 +140,6 @@ def load_model():
         return None
 
 
-
-
 model = load_model()
 
 LABEL_NAMES = [
@@ -157,7 +158,7 @@ app = FastAPI()
 
 @app.post("/predict")
 async def predict(files: List[UploadFile] = File(...)):
-    global model, last_request_gpu_mem, last_request_gpu_mem_max
+    global model
     try:
         if model is None:
             model = load_model()
@@ -172,20 +173,10 @@ async def predict(files: List[UploadFile] = File(...)):
             images.append(tensor)
         batch_tensor = torch.stack(images).to(device)
 
-
-        mem_before = torch.cuda.memory_allocated() if torch.cuda.is_available() else 0
-        mem_max_before = torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0
-
         start_time = time.time()
-        print(f"[PREDICT] Inference start: {datetime.datetime.now().isoformat()}")
         preds, logits = await asyncio.to_thread(inference, batch_tensor)
         end_time = time.time()
-        print(f"[PREDICT] Inference end: {datetime.datetime.now().isoformat()}, duration: {end_time - start_time:.4f} seconds")
-
-        mem_after = torch.cuda.memory_allocated() if torch.cuda.is_available() else 0
-        mem_max_after = torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0
-        last_request_gpu_mem = mem_after - mem_before
-        last_request_gpu_mem_max = mem_max_after - mem_max_before
+        print(f"[PREDICT] duration: {end_time - start_time:.4f}s")
 
         probs = torch.nn.functional.softmax(torch.from_numpy(logits), dim=1).numpy()
         results = []
