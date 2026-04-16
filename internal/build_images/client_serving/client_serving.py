@@ -10,86 +10,9 @@ from torchvision import transforms
 import torch.nn as nn
 import torch.nn.functional as F
 
-import threading
-import csv
-import datetime
-from jtop import jtop
 import asyncio
 import time
 from typing import List
-
-
-latest_stats = {}
-def monitor_jtop():
-    try:
-        with jtop() as jetson:
-            # Print available keys once so we know what jtop provides
-            first = True
-            while jetson.ok():
-                latest_stats.update(jetson.stats)
-                if first:
-                    print(f"[JTOP KEYS] {list(jetson.stats.keys())}")
-                    first = False
-    except Exception as e:
-        print(f"[JTOP MONITOR] Error: {e}")
-
-
-
-def log_resource_usage():
-    stat_fields = [
-        'timestamp', 'cpu1', 'cpu2', 'cpu3', 'cpu4', 'cpu5', 'cpu6',
-        'gpu_util', 'gpu_allocated_mem', 'gpu_total_mem',
-        'ram', 'swap',
-        'fan', 'temp_cpu', 'temp_gpu', 'temp_soc0', 'temp_soc1', 'temp_soc2', 'temp_therm_junction',
-        'power_vdd_cpu_gpu_cv', 'power_vdd_soc', 'power_tot', 'jetson_clocks', 'nvp_model',
-    ]
-    log_path = "/home/model/resource_log.csv"
-
-    if not os.path.exists(log_path):
-        with open(log_path, 'w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(stat_fields)
-
-    while True:
-        gpu_mem = torch.cuda.memory_allocated() if torch.cuda.is_available() else ''
-        gpu_total = torch.cuda.get_device_properties(0).total_memory if torch.cuda.is_available() else ''
-        # Get GPU utilization - jtop may return it as int or dict
-        gpu_val = latest_stats.get('GPU', '')
-        if isinstance(gpu_val, dict):
-            gpu_val = gpu_val.get('val', gpu_val.get('cur', ''))
-        row = [
-            datetime.datetime.now().isoformat(),
-            latest_stats.get('CPU1', ''),
-            latest_stats.get('CPU2', ''),
-            latest_stats.get('CPU3', ''),
-            latest_stats.get('CPU4', ''),
-            latest_stats.get('CPU5', ''),
-            latest_stats.get('CPU6', ''),
-            gpu_val,
-            gpu_mem,
-            gpu_total,
-            latest_stats.get('RAM', ''),
-            latest_stats.get('SWAP', ''),
-            latest_stats.get('Fan pwmfan0', ''),
-            latest_stats.get('Temp cpu', ''),
-            latest_stats.get('Temp gpu', ''),
-            latest_stats.get('Temp soc0', ''),
-            latest_stats.get('Temp soc1', ''),
-            latest_stats.get('Temp soc2', ''),
-            latest_stats.get('Temp tj', ''),
-            latest_stats.get('Power VDD_CPU_GPU_CV', ''),
-            latest_stats.get('Power VDD_SOC', ''),
-            latest_stats.get('Power TOT', ''),
-            latest_stats.get('jetson_clocks', ''),
-            latest_stats.get('nvp model', ''),
-        ]
-        with open(log_path, 'a', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(row)
-        time.sleep(0.25)
-
-threading.Thread(target=monitor_jtop, daemon=True).start()
-threading.Thread(target=log_resource_usage, daemon=True).start()
 
 
 # 
