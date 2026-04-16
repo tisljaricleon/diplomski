@@ -12,6 +12,7 @@ import torch.nn.functional as F
 
 import asyncio
 import time
+from datetime import datetime
 from typing import List
 
 
@@ -77,7 +78,29 @@ def inference(tensor):
         return preds.cpu().numpy(), output.cpu().numpy()
 
 
+LIFECYCLE_LOG = "/home/model/lifecycle.log"
+
+
+def log_lifecycle(event: str):
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    pid = os.getpid()
+    msg = f"{ts},{pid},{event}\n"
+    print(f"[LIFECYCLE] {msg.strip()}")
+    with open(LIFECYCLE_LOG, "a") as f:
+        f.write(msg)
+
+
 app = FastAPI()
+
+
+@app.on_event("startup")
+async def on_startup():
+    log_lifecycle("STARTED")
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    log_lifecycle("SHUTDOWN")
 
 @app.post("/predict")
 async def predict(files: List[UploadFile] = File(...)):
