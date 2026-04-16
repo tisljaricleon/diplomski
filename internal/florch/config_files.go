@@ -186,19 +186,19 @@ const GlobalAggregatorServingConfig_Yaml = `
 server:
   address: "0.0.0.0:8000"
 model:
-  name: "model.pt"
+  name: "model_resnet18.pt"
 `
 
 const LocalAggregatorServingConfig_Yaml = `
 server:
   address: "0.0.0.0:8000"
 model:
-  name: "model.pt"
+  name: "model_resnet18.pt"
 `
 
 const ClientServingConfig_Yaml = `
 server:
   address: "0.0.0.0:8000"
 model:
-  name: "model.pt"
+  name: "model_resnet18.pt"
 `
