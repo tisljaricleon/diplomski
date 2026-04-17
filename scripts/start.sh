@@ -1,7 +1,7 @@
 curl -X POST http://10.19.4.45:8080/fl/start \
   -H "Content-Type: application/json" \
   -d '{
-    "epochs": 10,
+    "epochs": 40,
     "localRounds": 1,
     "trainingParams": {
       "batchSize": 32,
