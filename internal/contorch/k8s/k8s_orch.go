@@ -31,7 +31,7 @@ type K8sOrchestrator struct {
 	namespace          string
 }
 
-func NewK8sOrchestrator(configFilePath string, eventBus *events.EventBus, simulation bool, namespace string) (*K8sOrchestrator, error) {
+func NewK8sOrchestrator(configFilePath string, eventBus *events.EventBus, namespace string) (*K8sOrchestrator, error) {
 	config, err := clientcmd.BuildConfigFromFlags("", configFilePath)
 	if err != nil {
 		log.Println(err.Error())
@@ -50,15 +50,15 @@ func NewK8sOrchestrator(configFilePath string, eventBus *events.EventBus, simula
 		return nil, err
 	}
 
-	return &K8sOrchestrator{
-		config:           config,
-		clientset:        clientset,
-		metricsClientset: metricsClientset,
-		eventBus:         eventBus,
-		cronScheduler:    cron.New(cron.WithSeconds()),
-		availableNodes:   make(map[string]*model.Node),
-		namespace:          namespace,
-	}, nil
+	   return &K8sOrchestrator{
+		   config:           config,
+		   clientset:        clientset,
+		   metricsClientset: metricsClientset,
+		   eventBus:         eventBus,
+		   cronScheduler:    cron.New(cron.WithSeconds()),
+		   availableNodes:   make(map[string]*model.Node),
+		   namespace:        namespace,
+	   }, nil
 }
 
 func (orch *K8sOrchestrator) GetAvailableNodes(initialRequest bool) (map[string]*model.Node, error) {
