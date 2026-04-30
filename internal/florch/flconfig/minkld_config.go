@@ -1,4 +1,4 @@
-package flconfig
+﻿package flconfig
 
 import (
 	"fmt"
@@ -11,15 +11,17 @@ import (
 type MinimizeKldConfiguration struct {
 	epochs              int32
 	localRounds         int32
+	globalRounds        int32
 	bestClusters        [][]*model.Node
 	averageDistribution []float64
 	bestKld             float64
 }
 
-func NewMinimizeKldConfiguration(epochs int32, localRounds int32) *MinimizeKldConfiguration {
+func NewMinimizeKldConfiguration(epochs int32, localRounds int32, globalRounds int32) *MinimizeKldConfiguration {
 	return &MinimizeKldConfiguration{
 		epochs:      epochs,
 		localRounds: localRounds,
+		globalRounds: globalRounds,
 	}
 }
 
@@ -32,14 +34,14 @@ func (config *MinimizeKldConfiguration) GetOptimalConfiguration(nodes []*model.N
 
 	if len(localAggregators) <= 1 {
 		// centralized
-		flGlobalAggregator = &model.FlAggregator{
-			Id:              globalAggregator.Id,
-			InternalAddress: fmt.Sprintf("%s:%s", "0.0.0.0", fmt.Sprint(common.GLOBAL_AGGREGATOR_PORT)),
-			ExternalAddress: common.GetGlobalAggregatorExternalAddress(globalAggregator.Id),
-			Port:            common.GLOBAL_AGGREGATOR_PORT,
-			NumClients:      2, //int32(len(clients))
-			Rounds:          common.GLOBAL_AGGREGATOR_ROUNDS,
-		}
+        flGlobalAggregator = &model.FlAggregator{
+            Id:              globalAggregator.Id,
+            InternalAddress: fmt.Sprintf("%s:%s", "0.0.0.0", fmt.Sprint(common.FL_AGG_PORT)),
+            ExternalAddress: common.GetGlAggClusterAddress(globalAggregator.Id),
+            Port:            common.FL_AGG_PORT,
+            NumClients:      2, //int32(len(clients))
+            Rounds:          config.globalRounds,
+        }
 		flClients = common.ClientNodesToFlClients(clients, flGlobalAggregator, config.epochs*config.localRounds)
 
 		return &FlConfiguration{
@@ -78,26 +80,26 @@ func (config *MinimizeKldConfiguration) GetOptimalConfiguration(nodes []*model.N
 	fmt.Println("Best KLD: ", config.bestKld)
 
 	// prepare clients and aggregators
-	flGlobalAggregator = &model.FlAggregator{
-		Id:              globalAggregator.Id,
-		InternalAddress: fmt.Sprintf("%s:%s", "0.0.0.0", fmt.Sprint(common.GLOBAL_AGGREGATOR_PORT)),
-		ExternalAddress: common.GetGlobalAggregatorExternalAddress(globalAggregator.Id),
-		Port:            common.GLOBAL_AGGREGATOR_PORT,
-		NumClients:      int32(len(localAggregators)),
-		Rounds:          common.GLOBAL_AGGREGATOR_ROUNDS,
-	}
+        flGlobalAggregator = &model.FlAggregator{
+            Id:              globalAggregator.Id,
+            InternalAddress: fmt.Sprintf("%s:%s", "0.0.0.0", fmt.Sprint(common.FL_AGG_PORT)),
+            ExternalAddress: common.GetGlAggClusterAddress(globalAggregator.Id),
+            Port:            common.FL_AGG_PORT,
+            NumClients:      int32(len(localAggregators)),
+            Rounds:          config.globalRounds,
+        }
 	for n, cluster := range config.bestClusters {
 		localAggregator := localAggregators[n]
-		localFlAggregator := &model.FlAggregator{
-			Id:              localAggregator.Id,
-			InternalAddress: fmt.Sprintf("%s:%s", "0.0.0.0", fmt.Sprint(common.LOCAL_AGGREGATOR_PORT)),
-			ExternalAddress: common.GetLocalAggregatorExternalAddress(localAggregator.Id),
-			Port:            common.LOCAL_AGGREGATOR_PORT,
-			NumClients:      2, // int32(len(cluster))
-			Rounds:          common.LOCAL_AGGREGATOR_ROUNDS,
-			LocalRounds:     config.localRounds,
-			ParentAddress:   flGlobalAggregator.ExternalAddress,
-		}
+            localFlAggregator := &model.FlAggregator{
+                Id:              localAggregator.Id,
+                InternalAddress: fmt.Sprintf("%s:%s", "0.0.0.0", fmt.Sprint(common.FL_AGG_PORT)),
+                ExternalAddress: common.GetLocAggClusterAddress(localAggregator.Id),
+                Port:            common.FL_AGG_PORT,
+                NumClients:      2, // int32(len(cluster))
+                Rounds:          config.localRounds,
+                LocalRounds:     config.localRounds,
+                ParentAddress:   flGlobalAggregator.ExternalAddress,
+            }
 		flLocalAggregators = append(flLocalAggregators, localFlAggregator)
 		flClientsCluster := common.ClientNodesToFlClients(cluster, localFlAggregator, config.epochs)
 		flClients = append(flClients, flClientsCluster...)
@@ -143,3 +145,4 @@ func deepCopyClusters(clusters [][]*model.Node) [][]*model.Node {
 	}
 	return newClusters
 }
+

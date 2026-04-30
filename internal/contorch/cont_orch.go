@@ -10,17 +10,18 @@ type IContainerOrchestrator interface {
 	GetAvailableNodes(initialRequest bool) (map[string]*model.Node, error)
 	StartNodeStateChangeNotifier()
 	StopAllNotifiers()
-	CreateGlobalAggregator(aggregator *model.FlAggregator, configFiles map[string]string) error
-	CreateGlobalAggregatorServing(aggregator *model.FlAggregator, configFiles map[string]string) error
-	GetGlobalAggregatorLogs(aggregatorId string) (bytes.Buffer, error)
-	RemoveGlobalAggregator(aggregator *model.FlAggregator) error
-	RemoveGlobalAggregatorServing(aggregator *model.FlAggregator) error
-	CreateLocalAggregator(aggregator *model.FlAggregator, configFiles map[string]string) error
-	RemoveLocalAggregator(aggregator *model.FlAggregator) error
-	CreateFlClient(client *model.FlClient, configFiles map[string]string) error
-	CreateFlClientServing(client *model.FlClient, configFiles map[string]string) error
-	RemoveFlClient(client *model.FlClient) error
-	RemoveFlClientServing(client *model.FlClient) error
-	//RemoveClient(client *model.FlClient) error
+
+	CreateGlAgg(aggregator *model.FlAggregator, configFiles map[string]string) error
+	RemoveGlAgg(aggregator *model.FlAggregator) error
+	GetGlAggLogs(aggregatorId string) (bytes.Buffer, error)
+	CreateLocAgg(aggregator *model.FlAggregator, configFiles map[string]string) error
+	RemoveLocAgg(aggregator *model.FlAggregator) error
+	GetLocAggLogs(aggregatorId string) (bytes.Buffer, error)
+
+	CreateClient(client *model.FlClient, configFiles map[string]string) error
+	RemoveClient(client *model.FlClient) error
 	GetClientLogs(clientId string) (bytes.Buffer, error)
+
+	CreateInfService(nodeType string, nodeId string, configFiles map[string]string) error
+	RemoveInfService(nodeId string) error
 }

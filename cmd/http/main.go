@@ -32,17 +32,12 @@ func main() {
 	eventBus := events.NewEventBus()
 
 	namespace := ""
-	simulation := false
-	if len(os.Args) == 3 {
-		deplType := os.Args[1]
-		if deplType == "sim" {
-			simulation = true
-		}
-		namespace = os.Args[2]
+	if len(os.Args) == 2 {
+		namespace = os.Args[1]
 	}
 
 	k8sConfigFilePath := "../../configs/cluster/kube_config.yaml"
-	k8sOrchestrator, err := k8sorch.NewK8sOrchestrator(k8sConfigFilePath, eventBus, simulation, namespace)
+	k8sOrchestrator, err := k8sorch.NewK8sOrchestrator(k8sConfigFilePath, eventBus, namespace)
 	if err != nil {
 		logger.Error("Error while initializing k8s client ::", err.Error())
 		return

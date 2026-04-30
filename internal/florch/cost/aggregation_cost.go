@@ -33,7 +33,7 @@ func GetGlobalRoundCost(configuration *flconfig.FlConfiguration, nodes map[strin
 		gaCost := float32(0.0)
 		for _, localAggregator := range configuration.LocalAggregators {
 			laNode := nodes[localAggregator.Id]
-			linkCost := laNode.CommunicationCosts[configuration.GlobalAggregator.Id]
+			linkCost := laNode.Labels.Fl.CommunicationCosts[configuration.GlobalAggregator.Id]
 
 			gaCost += linkCost * modelSize
 		}
@@ -41,7 +41,7 @@ func GetGlobalRoundCost(configuration *flconfig.FlConfiguration, nodes map[strin
 		laCost := float32(0.0)
 		for _, client := range configuration.Clients {
 			clientNode := nodes[client.Id]
-			linkCost := clientNode.CommunicationCosts[client.ParentNodeId]
+			linkCost := clientNode.Labels.Fl.CommunicationCosts[client.ParentNodeId]
 
 			if configuration.LocalRounds == 0 {
 				laCost += linkCost * modelSize
@@ -57,12 +57,12 @@ func GetGlobalRoundCost(configuration *flconfig.FlConfiguration, nodes map[strin
 
 	gaCost := float32(0.0)
 	gaNode := nodes[configuration.GlobalAggregator.Id]
-	gaCost = gaNode.EnergyCost
+	gaCost = gaNode.Labels.Fl.EnergyCost
 
 	laCost := float32(0.0)
 	for _, localAggregator := range configuration.LocalAggregators {
 		laNode := nodes[localAggregator.Id]
-		energyCost := laNode.EnergyCost * float32(configuration.LocalRounds)
+		energyCost := laNode.Labels.Fl.EnergyCost * float32(configuration.LocalRounds)
 		laCost += float32(energyCost)
 	}
 
@@ -74,7 +74,7 @@ func GetGlobalRoundCost(configuration *flconfig.FlConfiguration, nodes map[strin
 			continue
 		}
 		clNode := nodes[client.Id]
-		energyCost := clNode.EnergyCost * float32(configuration.Epochs) * float32(configuration.LocalRounds)
+		energyCost := clNode.Labels.Fl.EnergyCost * float32(configuration.Epochs) * float32(configuration.LocalRounds)
 		clCost += (energyCost)
 	}
 
@@ -98,7 +98,7 @@ func GetReconfigurationChangeCost(oldConfiguration *flconfig.FlConfiguration, ne
 		oldClient := common.GetClientInArray(oldConfiguration.Clients, newClient.Id)
 		if (oldClient == &model.FlClient{} || newClient.ParentNodeId != oldClient.ParentNodeId) {
 			newClientNode := nodes[newClient.Id]
-			linkCost := newClientNode.CommunicationCosts[newClient.ParentNodeId]
+			linkCost := newClientNode.Labels.Fl.CommunicationCosts[newClient.ParentNodeId]
 
 			reconfigurationChangeCost += (linkCost / 2) * modelSize
 

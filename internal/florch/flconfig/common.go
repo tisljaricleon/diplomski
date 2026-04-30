@@ -46,8 +46,8 @@ func getClusterDataDistribution(nodes []*model.Node) []float64 {
 	totalSamples := 0
 	samplesPerClass := make([]int64, 10)
 	for _, node := range nodes {
-		if node.FlType == common.FL_TYPE_CLIENT {
-			dataDistribution := node.DataDistribution
+		if node.Labels.Fl.Type == common.FL_TYPE_CLIENT {
+			dataDistribution := node.Labels.Fl.DataDistribution
 			for class, samples := range dataDistribution {
 				i, _ := strconv.Atoi(class)
 				samplesPerClass[i] += samples
@@ -119,7 +119,7 @@ func getHierarchicalAggregationCosts(globalAggregator *model.Node, localAggregat
 func calculateAggregationCost(clients []*model.Node, aggregatorNodeId string, modelSize float32) (float32, error) {
 	aggregationCost := float32(0.0)
 	for _, client := range clients {
-		communicationCosts := client.CommunicationCosts
+		communicationCosts := client.Labels.Fl.CommunicationCosts
 		cost, exists := communicationCosts[aggregatorNodeId]
 		if !exists {
 			return 0.0, fmt.Errorf("no comm cost value from client %s to aggregator %s", client.Id, aggregatorNodeId)

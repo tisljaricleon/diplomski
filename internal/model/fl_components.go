@@ -14,12 +14,15 @@ type FlClient struct {
 }
 
 type FlAggregator struct {
-	Id              string
-	InternalAddress string
-	ExternalAddress string
-	ParentAddress   string
-	Port            int32
-	NumClients      int32
-	Rounds          int32
-	LocalRounds     int32
+	Id                  string
+	InternalAddress     string
+	ExternalAddress     string
+	ParentAddress       string
+	Port                int32
+	NumClients          int32
+	Rounds              int32
+	LocalRounds         int32
+	MinFitClients       int32
+	MinEvaluateClients  int32
+	MinAvailableClients int32
 }

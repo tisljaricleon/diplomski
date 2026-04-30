@@ -1,7 +1,6 @@
 package k8sorch
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -22,12 +21,6 @@ import (
 	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
-const flTypeLabel = "fl/type"
-const numPartitionsLabel = "fl/num-partitions"
-const partitionIdLabel = "fl/partition-id"
-const communicationCostPrefix = "comm/"
-const dataDistributionPrefix = "data/"
-
 type K8sOrchestrator struct {
 	config             *rest.Config
 	clientset          *kubernetes.Clientset
@@ -35,14 +28,10 @@ type K8sOrchestrator struct {
 	eventBus           *events.EventBus
 	cronScheduler      *cron.Cron
 	availableNodes     map[string]*model.Node
-	simulation         bool
-	simulationNodes    []string
-	lastSimulationNode int
 	namespace          string
 }
 
 func NewK8sOrchestrator(configFilePath string, eventBus *events.EventBus, simulation bool, namespace string) (*K8sOrchestrator, error) {
-	// connect to Kubernetes cluster
 	config, err := clientcmd.BuildConfigFromFlags("", configFilePath)
 	if err != nil {
 		log.Println(err.Error())
@@ -68,32 +57,11 @@ func NewK8sOrchestrator(configFilePath string, eventBus *events.EventBus, simula
 		eventBus:         eventBus,
 		cronScheduler:    cron.New(cron.WithSeconds()),
 		availableNodes:   make(map[string]*model.Node),
-		simulation:       simulation,
-		simulationNodes: []string{"hfl-n1", "hfl-n2", "hfl-n3", "hfl-n4", "hfl-n5", "hfl-n6",
-			"hfl-n7", "hfl-n8", "hfl-n9", "hfl-n10", "hfl-n11", "hfl-n12", "hfl-n13",
-			"hfl-n14", "hfl-n15", "hfl-n16", "hfl-n17", "hfl-n18", "hfl-n19", "hfl-n20",
-			"hfl-n21", "hfl-n22", "hfl-n23", "hfl-n24", "hfl-n25", "hfl-n26", "hfl-n27",
-			"hfl-n28", "hfl-n29", "hfl-n30"},
-		lastSimulationNode: 0,
 		namespace:          namespace,
 	}, nil
 }
 
 func (orch *K8sOrchestrator) GetAvailableNodes(initialRequest bool) (map[string]*model.Node, error) {
-	if orch.simulation {
-		nodes, err := common.GetAvailableNodesFromFile()
-		if err != nil {
-			return nil, err
-		}
-		if initialRequest {
-			for _, node := range nodes {
-				orch.availableNodes[node.Id] = node
-			}
-		}
-
-		return nodes, nil
-	}
-
 	nodesCoreList, err := orch.clientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		log.Println("Failed to retrieve nodes on node status")
@@ -137,6 +105,71 @@ func (orch *K8sOrchestrator) GetAvailableNodes(initialRequest bool) (map[string]
 	return nodes, nil
 }
 
+func nodeCoreToNodeModel(nodeCore corev1.Node, nodeMetric v1beta1.NodeMetrics) *model.Node {
+	cpuUsage := nodeMetric.Usage[corev1.ResourceCPU]
+	cpuPercentage := float64(cpuUsage.MilliValue()) / float64(nodeCore.Status.Capacity.Cpu().MilliValue())
+
+	memoryUsage := nodeMetric.Usage[corev1.ResourceMemory]
+	memoryPercentage := float64(memoryUsage.Value()) / float64(nodeCore.Status.Capacity.Memory().Value())
+
+	hostIP := getHostIp(nodeCore)
+
+	nodeModel := &model.Node{
+		Id:         nodeCore.Name,
+		InternalIp: hostIP,
+		Resources: model.NodeResources{
+			CpuUsage: cpuPercentage,
+			RamUsage: memoryPercentage,
+		},
+	}
+
+	nodeLabelsToNodeModel(nodeCore.Labels, nodeModel)
+
+	if nodeModel.Labels.Fl.Type == "" {
+		return nil
+	}
+
+	return nodeModel
+}
+
+func nodeLabelsToNodeModel(labels map[string]string, nodeModel *model.Node) {
+		flType := labels[common.FlTypeLabel]
+		numPartitions, _ := strconv.Atoi(labels[common.NumPartitionsLabel])
+		partitionId, _ := strconv.Atoi(labels[common.PartitionIdLabel])
+		imageType := labels[common.ImageTypeLabel]
+		useMPS := labels[common.UseMPSLabel] == "true"
+		proxyNodePort, _ := strconv.Atoi(labels[common.ProxyNodePortLabel])
+
+		communicationCosts := make(map[string]float32)
+		dataDistribution := make(map[string]int64)
+		for key, value := range labels {
+			if strings.HasPrefix(key, common.CommunicationCostPrefix) {
+				splits := strings.Split(key, common.CommunicationCostPrefix)
+				if len(splits) == 2 {
+					cost, _ := strconv.ParseFloat(value, 32)
+					communicationCosts[splits[1]] = float32(cost)
+				}
+			} else if strings.HasPrefix(key, common.DataDistributionPrefix) {
+				splits := strings.Split(key, common.DataDistributionPrefix)
+				if len(splits) == 2 {
+					numberOfSamples, _ := strconv.Atoi(value)
+					dataDistribution[splits[1]] = int64(numberOfSamples)
+				}
+			}
+		}
+
+		nodeModel.Labels.Fl.Type = flType
+		nodeModel.Labels.Fl.PartitionId = int32(partitionId)
+		nodeModel.Labels.Fl.NumPartitions = int32(numPartitions)
+		nodeModel.Labels.Fl.EnergyCost = 0.0
+		nodeModel.Labels.Fl.CommunicationCosts = communicationCosts
+		nodeModel.Labels.Fl.DataDistribution = dataDistribution
+		nodeModel.Labels.Common.ImageType = imageType
+		nodeModel.Labels.Common.UseMPS = useMPS
+		nodeModel.Labels.InfProxy.NodePort = int32(proxyNodePort)
+}
+
+// Event notifiers
 func (orch *K8sOrchestrator) StartNodeStateChangeNotifier() {
 	orch.cronScheduler.AddFunc("@every 1s", orch.notifyNodeStateChanges)
 
@@ -161,295 +194,8 @@ func (orch *K8sOrchestrator) notifyNodeStateChanges() {
 	orch.availableNodes = availableNodesNew
 }
 
-func (orch *K8sOrchestrator) CreateGlobalAggregator(aggregator *model.FlAggregator, configFiles map[string]string) error {
-	err := orch.createConfigMapFromFiles(common.GetGlobalAggregatorConfigMapName(aggregator.Id), configFiles)
-	if err != nil {
-		return err
-	}
 
-	pvc := BuildGlobalAggregatorPVC(aggregator.Id, orch.namespace)
-	err = orch.createPersistentVolumeClaim(pvc)
-	if err != nil {
-		return err
-	}
-
-	pv := BuildGlobalAggregatorPV(aggregator.Id, orch.namespace)
-	err = orch.createPersistentVolume(pv)
-	if err != nil {
-		return err
-	}
-
-	deployment := BuildGlobalAggregatorDeployment(aggregator, orch.namespace)
-	if !orch.simulation {
-		deployment.Spec.Template.Spec.NodeName = aggregator.Id
-	} else {
-		deployment.Spec.Template.Spec.NodeName = orch.simulationNodes[orch.lastSimulationNode]
-		orch.lastSimulationNode++
-	}
-	err = orch.createDeployment(deployment)
-	if err != nil {
-		return err
-	}
-
-	service := BuildGlobalAggregatorService(aggregator)
-	err = orch.createService(service)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (orch *K8sOrchestrator) RemoveGlobalAggregator(aggregator *model.FlAggregator) error {
-	err := orch.deleteService(common.GetGlobalAggregatorServiceName(aggregator.Id))
-	if err != nil {
-		return err
-	}
-
-	err = orch.deleteDeployment(common.GetGlobalAggregatorDeploymentName(aggregator.Id))
-	if err != nil {
-		return err
-	}
-
-	err = orch.deleteConfigMap(common.GetGlobalAggregatorConfigMapName(aggregator.Id))
-	if err != nil {
-		return err
-	}
-
-    err = orch.deletePersistentVolumeClaim(common.GetGlobalAggregatorPersistentVolumeClaimName(aggregator.Id), orch.namespace)
-    if err != nil {
-        return err
-    }
-
-    err = orch.deletePersistentVolume(common.GetGlobalAggregatorPersistentVolumeName(aggregator.Id))
-    if err != nil {
-        return err
-    }
-
-	return nil
-}
-
-func (orch *K8sOrchestrator) CreateGlobalAggregatorServing(aggregator *model.FlAggregator, configFiles map[string]string) error {
-	err := orch.createConfigMapFromFiles(common.GetGlobalAggregatorServingConfigMapName(aggregator.Id), configFiles)
-	if err != nil {
-		return err
-	}
-
-	deployment := BuildGlobalAggregatorServingDeployment(aggregator, orch.namespace)
-	if !orch.simulation {
-		deployment.Spec.Template.Spec.NodeName = aggregator.Id
-	} else {
-		deployment.Spec.Template.Spec.NodeName = orch.simulationNodes[orch.lastSimulationNode]
-		orch.lastSimulationNode++
-	}
-	err = orch.createDeployment(deployment)
-	if err != nil {
-		return err
-	}
-
-	service := BuildGlobalAggregatorServingService(aggregator)
-	err = orch.createService(service)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (orch *K8sOrchestrator) RemoveGlobalAggregatorServing(aggregator *model.FlAggregator) error {
-	err := orch.deleteService(common.GetGlobalAggregatorServingServiceName(aggregator.Id))
-	if err != nil {
-		return err
-	}
-
-	err = orch.deleteDeployment(common.GetGlobalAggregatorServingDeploymentName(aggregator.Id))
-	if err != nil {
-		return err
-	}
-
-	err = orch.deleteConfigMap(common.GetGlobalAggregatorServingConfigMapName(aggregator.Id))
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (orch *K8sOrchestrator) CreateLocalAggregator(aggregator *model.FlAggregator, configFiles map[string]string) error {
-	err := orch.createConfigMapFromFiles(common.GetLocalAggregatorConfigMapName(aggregator.Id), configFiles)
-	if err != nil {
-		return err
-	}
-
-	pvc := BuildLocalAggregatorPVC(aggregator.Id, orch.namespace)
-	err = orch.createPersistentVolumeClaim(pvc)
-	if err != nil {
-		return err
-	}
-
-	pv := BuildLocalAggregatorPV(aggregator.Id, orch.namespace)
-	err = orch.createPersistentVolume(pv)
-	if err != nil {
-		return err
-	}
-
-	deployment := BuildLocalAggregatorDeployment(aggregator, orch.namespace)
-	if !orch.simulation {
-		deployment.Spec.Template.Spec.NodeName = aggregator.Id
-	} else {
-		deployment.Spec.Template.Spec.NodeName = orch.simulationNodes[orch.lastSimulationNode]
-		orch.lastSimulationNode++
-	}
-
-	err = orch.createDeployment(deployment)
-	if err != nil {
-		return err
-	}
-
-	service := BuildLocalAggregatorService(aggregator)
-	err = orch.createService(service)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (orch *K8sOrchestrator) RemoveLocalAggregator(aggregator *model.FlAggregator) error {
-	err := orch.deleteService(common.GetLocalAggregatorServiceName(aggregator.Id))
-	if err != nil {
-		return err
-	}
-
-	err = orch.deleteDeployment(common.GetLocalAggregatorDeploymentName(aggregator.Id))
-	if err != nil {
-		return err
-	}
-
-	err = orch.deleteConfigMap(common.GetLocalAggregatorConfigMapName(aggregator.Id))
-	if err != nil {
-		return err
-	}
-
-	err = orch.deletePersistentVolumeClaim(common.GetLocalAggregatorPersistentVolumeClaimName(aggregator.Id), orch.namespace)
-	if err != nil {
-		return err
-	}
-
-	err = orch.deletePersistentVolume(common.GetLocalAggregatorPersistentVolumeName(aggregator.Id))
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (orch *K8sOrchestrator) CreateFlClient(client *model.FlClient, configFiles map[string]string) error {
-	err := orch.createConfigMapFromFiles(common.GetClientConfigMapName(client.Id), configFiles)
-	if err != nil {
-		return err
-	}
-
-	pvc := BuildClientPVC(client.Id, orch.namespace)
-	err = orch.createPersistentVolumeClaim(pvc)
-	if err != nil {
-		return err
-	}
-
-	pv := BuildClientPV(client.Id, orch.namespace)
-	err = orch.createPersistentVolume(pv)
-	if err != nil {
-		return err
-	}
-
-	deployment := BuildClientDeployment(client, orch.namespace)
-	if !orch.simulation {
-		deployment.Spec.Template.Spec.NodeName = client.Id
-	} else {
-		deployment.Spec.Template.Spec.NodeName = orch.simulationNodes[orch.lastSimulationNode]
-		orch.lastSimulationNode++
-		if orch.lastSimulationNode == len(orch.simulationNodes) {
-			orch.lastSimulationNode = 3
-		}
-	}
-	err = orch.createDeployment(deployment)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (orch *K8sOrchestrator) RemoveFlClient(client *model.FlClient) error {
-	err := orch.deleteDeployment(common.GetClientDeploymentName(client.Id))
-	if err != nil {
-		return err
-	}
-
-	err = orch.deleteConfigMap(common.GetClientConfigMapName(client.Id))
-	if err != nil {
-		return err
-	}
-
-	err = orch.deletePersistentVolumeClaim(common.GetClientPersistentVolumeClaimName(client.Id), orch.namespace)
-	if err != nil {
-		return err
-	}
-
-	err = orch.deletePersistentVolume(common.GetClientPersistentVolumeName(client.Id))
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (orch *K8sOrchestrator) CreateFlClientServing(client *model.FlClient, configFiles map[string]string) error {
-	err := orch.createConfigMapFromFiles(common.GetClientServingConfigMapName(client.Id), configFiles)
-	if err != nil {
-		return err
-	}
-
-	deployment := BuildClientServingDeployment(client, orch.namespace)
-	if !orch.simulation {
-		deployment.Spec.Template.Spec.NodeName = client.Id
-	} else {
-		deployment.Spec.Template.Spec.NodeName = orch.simulationNodes[orch.lastSimulationNode]
-		orch.lastSimulationNode++
-	}
-	err = orch.createDeployment(deployment)
-	if err != nil {
-		return err
-	}
-
-	service := BuildClientServingService(client)
-	err = orch.createService(service)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (orch *K8sOrchestrator) RemoveFlClientServing(client *model.FlClient) error {
-	err := orch.deleteService(common.GetClientServingServiceName(client.Id))
-	if err != nil {
-		return err
-	}
-
-	err = orch.deleteDeployment(common.GetClientServingDeploymentName(client.Id))
-	if err != nil {
-		return err
-	}
-
-	err = orch.deleteConfigMap(common.GetClientServingConfigMapName(client.Id))
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
+// Create Kubernetes resources
 func (orch *K8sOrchestrator) createConfigMapFromFiles(configMapName string, filesData map[string]string) error {
 	configMapsClient := orch.clientset.CoreV1().ConfigMaps(orch.namespace)
 
@@ -565,8 +311,7 @@ func (orch *K8sOrchestrator) deletePersistentVolumeClaim(pvcName, pvcNamespace s
 	return nil
 }
 
-// HELPER METHODS
-
+// Helper functions
 func isNodeReady(nodeCore corev1.Node) bool {
 	for _, condition := range nodeCore.Status.Conditions {
 		if condition.Type == "Ready" {
@@ -581,56 +326,8 @@ func isNodeReady(nodeCore corev1.Node) bool {
 	return false
 }
 
-func nodeCoreToNodeModel(nodeCore corev1.Node, nodeMetric v1beta1.NodeMetrics) *model.Node {
-	cpuUsage := nodeMetric.Usage[corev1.ResourceCPU]
-	cpuPercentage := float64(cpuUsage.MilliValue()) / float64(nodeCore.Status.Capacity.Cpu().MilliValue())
-
-	memoryUsage := nodeMetric.Usage[corev1.ResourceMemory]
-	memoryPercentage := float64(memoryUsage.Value()) / float64(nodeCore.Status.Capacity.Memory().Value())
-
-	hostIP := getHostIp(nodeCore)
-
-	nodeModel := &model.Node{
-		Id:         nodeCore.Name,
-		InternalIp: hostIP,
-		Resources: model.NodeResources{
-			CpuUsage: cpuPercentage,
-			RamUsage: memoryPercentage,
-		},
-	}
-
-	nodeLabelsToNodeModel(nodeCore.Labels, nodeModel)
-
-	if nodeModel.FlType == "" {
-		return nil
-	}
-
-	return nodeModel
-}
-
-func nodeLabelsToNodeModel(labels map[string]string, nodeModel *model.Node) {
-	flType := labels[flTypeLabel]
-	numPartitions, _ := strconv.Atoi(labels[numPartitionsLabel])
-	partitionId, _ := strconv.Atoi(labels[partitionIdLabel])
-	communicationCosts := make(map[string]float32)
-	for key, value := range labels {
-		if strings.HasPrefix(key, communicationCostPrefix) {
-			splits := strings.Split(key, communicationCostPrefix)
-			if len(splits) == 2 {
-				cost, _ := strconv.ParseFloat(value, 32)
-				communicationCosts[splits[1]] = float32(cost)
-			}
-		}
-	}
-
-	nodeModel.FlType = flType
-	nodeModel.CommunicationCosts = communicationCosts
-	nodeModel.NumPartitions = int32(numPartitions)
-	nodeModel.PartitionId = int32(partitionId)
-}
-
 func getFlType(labels map[string]string) string {
-	flType := labels[flTypeLabel]
+	flType := labels[common.FlTypeLabel]
 	return flType
 }
 
@@ -638,14 +335,14 @@ func getCommCostsAndDataDistribution(labels map[string]string) (map[string]float
 	communicationCosts := make(map[string]float32)
 	dataDistribution := make(map[string]int64)
 	for key, value := range labels {
-		if strings.HasPrefix(key, communicationCostPrefix) {
-			splits := strings.Split(key, communicationCostPrefix)
+		if strings.HasPrefix(key, common.CommunicationCostPrefix) {
+			splits := strings.Split(key, common.CommunicationCostPrefix)
 			if len(splits) == 2 {
 				cost, _ := strconv.ParseFloat(value, 32)
 				communicationCosts[splits[1]] = float32(cost)
 			}
-		} else if strings.HasPrefix(key, dataDistributionPrefix) {
-			splits := strings.Split(key, dataDistributionPrefix)
+		} else if strings.HasPrefix(key, common.DataDistributionPrefix) {
+			splits := strings.Split(key, common.DataDistributionPrefix)
 			if len(splits) == 2 {
 				numberOfSamples, _ := strconv.Atoi(value)
 				dataDistribution[splits[1]] = int64(numberOfSamples)
@@ -666,76 +363,3 @@ func getHostIp(node corev1.Node) string {
 	return ""
 }
 
-func (orch *K8sOrchestrator) GetGlobalAggregatorLogs(aggregatorId string) (bytes.Buffer, error) {
-	// Get the deployment
-	deployment, err := orch.clientset.AppsV1().Deployments(orch.namespace).Get(context.TODO(),
-		common.GetGlobalAggregatorDeploymentName(aggregatorId), metav1.GetOptions{})
-	if err != nil {
-		return bytes.Buffer{}, fmt.Errorf("error retrieving deployment: %v", err)
-	}
-
-	// Get the selector from the deployment
-	labelSelector := metav1.FormatLabelSelector(deployment.Spec.Selector)
-
-	// List pods with the same labels
-	podList, err := orch.clientset.CoreV1().Pods(orch.namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: labelSelector,
-	})
-	if err != nil {
-		return bytes.Buffer{}, fmt.Errorf("error listing pods: %v", err)
-	}
-
-	// Get the logs of the pod
-	req := orch.clientset.CoreV1().Pods(orch.namespace).GetLogs(podList.Items[0].Name, &corev1.PodLogOptions{})
-	logs, err := req.Stream(context.TODO())
-	if err != nil {
-		return bytes.Buffer{}, err
-	}
-	defer logs.Close()
-
-	// Read the logs into a buffer
-	var buf bytes.Buffer
-	_, err = buf.ReadFrom(logs)
-	if err != nil {
-		return bytes.Buffer{}, err
-	}
-
-	return buf, nil
-}
-
-func (orch *K8sOrchestrator) GetClientLogs(clientId string) (bytes.Buffer, error) {
-	// Get the deployment
-	deployment, err := orch.clientset.AppsV1().Deployments(corev1.NamespaceDefault).Get(context.TODO(),
-		common.GetClientDeploymentName(clientId), metav1.GetOptions{})
-	if err != nil {
-		return bytes.Buffer{}, fmt.Errorf("error retrieving deployment: %v", err)
-	}
-
-	// Get the selector from the deployment
-	labelSelector := metav1.FormatLabelSelector(deployment.Spec.Selector)
-
-	// List pods with the same labels
-	podList, err := orch.clientset.CoreV1().Pods(corev1.NamespaceDefault).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: labelSelector,
-	})
-	if err != nil {
-		return bytes.Buffer{}, fmt.Errorf("error listing pods: %v", err)
-	}
-
-	// Get the logs of the pod
-	req := orch.clientset.CoreV1().Pods(corev1.NamespaceDefault).GetLogs(podList.Items[0].Name, &corev1.PodLogOptions{})
-	logs, err := req.Stream(context.TODO())
-	if err != nil {
-		return bytes.Buffer{}, err
-	}
-	defer logs.Close()
-
-	// Read the logs into a buffer
-	var buf bytes.Buffer
-	_, err = buf.ReadFrom(logs)
-	if err != nil {
-		return bytes.Buffer{}, err
-	}
-
-	return buf, nil
-}

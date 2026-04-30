@@ -67,11 +67,11 @@ func getOptimalConfigurationCentralized(nodes []*model.Node, modelSize float32, 
 
 	flGlobalAggregator := &model.FlAggregator{
 		Id:              globalAggregator.Id,
-		InternalAddress: fmt.Sprintf("%s:%s", "0.0.0.0", fmt.Sprint(common.GLOBAL_AGGREGATOR_PORT)),
-		ExternalAddress: common.GetGlobalAggregatorExternalAddress(globalAggregator.Id),
-		Port:            common.GLOBAL_AGGREGATOR_PORT,
+		InternalAddress: fmt.Sprintf("%s:%s", "0.0.0.0", fmt.Sprint(common.FL_AGG_PORT)),
+		ExternalAddress: common.GetGlAggClusterAddress(globalAggregator.Id),
+		Port:            common.FL_AGG_PORT,
 		NumClients:      int32(len(clients)),
-		Rounds:          common.GLOBAL_AGGREGATOR_ROUNDS,
+		Rounds:          minEpochs,
 	}
 	flClients := common.ClientNodesToFlClients(clients, flGlobalAggregator, int32(minEpochs))
 
@@ -142,21 +142,21 @@ func (config *CentrHierFlConfiguration) getOptimalConfigurationHierarchical(node
 	// prepare clients and aggregators
 	flGlobalAggregator = &model.FlAggregator{
 		Id:              globalAggregator.Id,
-		InternalAddress: fmt.Sprintf("%s:%s", "0.0.0.0", fmt.Sprint(common.GLOBAL_AGGREGATOR_PORT)),
-		ExternalAddress: common.GetGlobalAggregatorExternalAddress(globalAggregator.Id),
-		Port:            common.GLOBAL_AGGREGATOR_PORT,
+		InternalAddress: fmt.Sprintf("%s:%s", "0.0.0.0", fmt.Sprint(common.FL_AGG_PORT)),
+		ExternalAddress: common.GetGlAggClusterAddress(globalAggregator.Id),
+		Port:            common.FL_AGG_PORT,
 		NumClients:      int32(len(localAggregators)),
-		Rounds:          common.GLOBAL_AGGREGATOR_ROUNDS,
+		Rounds:          epochs,
 	}
 	for n, cluster := range config.bestClusters {
 		localAggregator := localAggregators[n]
 		localFlAggregator := &model.FlAggregator{
 			Id:              localAggregator.Id,
-			InternalAddress: fmt.Sprintf("%s:%s", "0.0.0.0", fmt.Sprint(common.LOCAL_AGGREGATOR_PORT)),
-			ExternalAddress: common.GetLocalAggregatorExternalAddress(localAggregator.Id),
-			Port:            common.LOCAL_AGGREGATOR_PORT,
+			InternalAddress: fmt.Sprintf("%s:%s", "0.0.0.0", fmt.Sprint(common.FL_AGG_PORT)),
+			ExternalAddress: common.GetLocAggClusterAddress(localAggregator.Id),
+			Port:            common.FL_AGG_PORT,
 			NumClients:      2, // int32(len(cluster))
-			Rounds:          common.LOCAL_AGGREGATOR_ROUNDS,
+			Rounds:          localRounds,
 			LocalRounds:     localRounds,
 			ParentAddress:   flGlobalAggregator.ExternalAddress,
 		}
@@ -167,3 +167,4 @@ func (config *CentrHierFlConfiguration) getOptimalConfigurationHierarchical(node
 
 	return flGlobalAggregator, flLocalAggregators, flClients, epochs, localRounds
 }
+

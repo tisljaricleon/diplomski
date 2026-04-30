@@ -1,59 +1,55 @@
 package common
 
+// Labels
+const CommonPrefix = "common/"
+const ImageTypeLabel = "image-type"
+const UseMPSLabel = "use-mps"
+
+const FlPrefix = "fl/"
+const FlTypeLabel = "type"
+const NumPartitionsLabel = "num-partitions"
+const PartitionIdLabel = "partition-id"
+const CommunicationCostPrefix = "comm/"
+const DataDistributionPrefix = "data/"
+
+const InfProxyPrefix = "inf-proxy/"
+const ProxyNodePortLabel = "node-port"
+
+
+// Node image type labels
+const IMAGE_TYPE_RPI = "rpi"
+const IMAGE_TYPE_JETSON = "jetson"
+
 // Container images
-const FL_CLIENT_IMAGE = "leontisljaric/hfl-client:0.3"
-const LOCAL_AGGRETATOR_IMAGE = "cilicivan96/hfl-local-server:0.2"
-const GLOBAL_AGGRETATOR_IMAGE = "leontisljaric/hfl-global-server:0.3"
+const FL_RPI_IMAGE = "leontisljaric/fl-rpi:0.1"
+const FL_JETSON_IMAGE = "leontisljaric/fl-jetson:0.1"
+const INF_SERVICE_RPI_IMAGE = "leontisljaric/inf-service-rpi:0.1"
+const INF_SERVICE_JETSON_IMAGE = "leontisljaric/inf-service-jetson:0.1"
+const INF_PROXY_RPI_IMAGE = "leontisljaric/inf-proxy-rpi:0.1"
+const INF_PROXY_JETSON_IMAGE = "leontisljaric/inf-proxy-jetson:0.1"
 
-const GLOBAL_AGGREGATOR_SERVING_IMAGE = "leontisljaric/hfl-serving:0.1"
-const CLIENT_SERVING_IMAGE = "leontisljaric/hfl-serving:0.3"
-const LOCAL_AGGREGATOR_SERVING_IMAGE = "leontisljaric/hfl-serving:0.1"
+// Component prefixes
+const FL_GLOBAL_AGG_PREFIX = "fl-gl"
+const FL_LOCAL_AGG_PREFIX = "fl-la"
+const FL_CLIENT_PREFIX = "fl-cl"
+const INF_SERVICE_PREFIX = "inf-service"
+const INF_PROXY_PREFIX = "inf-proxy"
 
-// FL Client configs
-const FL_CLIENT_DEPLOYMENT_PREFIX = "fl-cl"
-const FL_CLIENT_CONFIG_MOUNT_PATH = "/home/"
-const FL_CLIENT_CONFIG_MAP_PREFIX = "fl-cl-cm"
-const FL_CLIENT_PERSISTENT_VOLUME_PREFIX = "fl-cl-pv"
-const FL_CLIENT_PERSISTENT_VOLUME_CLAIM_PREFIX = "fl-cl-pvc"
-const FL_CLIENT_CPU_REQUEST = 0.5
-const FL_CLIENT_SERVING_PORT = 8000
-const FL_CLIENT_SERVING_NODE_PORT = 30280
-const FL_CLIENT_SERVING_DEPLOYMENT_PREFIX = "fl-cl-serving"
-const FL_CLIENT_SERVING_CONFIG_MAP_PREFIX = "fl-cl-serving-cm"
-const FL_CLIENT_SERVING_SERVICE_PREFIX = "fl-cl-serving-svc"
+// Prefixes for Kubernetes resources
+const DEPLOYMENT_PREFIX = "dep"
+const CONFIG_MAP_PREFIX = "cm"
+const PV_PREFIX = "pv"
+const PVC_PREFIX = "pvc"
+const SERVICE_PREFIX = "svc"
 
-// GA configs
-const GLOBAL_AGGRETATOR_DEPLOYMENT_PREFIX = "fl-ga"
-const GLOBAL_AGGRETATOR_MOUNT_PATH = "/home/"
-const GLOBAL_AGGREGATOR_SERVICE_PREFIX = "fl-ga-svc"
-const GLOBAL_AGGREGATOR_CONFIG_MAP_PREFIX = "fl-ga-cm"
-const GLOBAL_AGGREGATOR_PERSISTENT_VOLUME_PREFIX = "fl-ga-pv"
-const GLOBAL_AGGREGATOR_PERSISTENT_VOLUME_CLAIM_PREFIX = "fl-ga-pvc"
-const GLOBAL_AGGREGATOR_PORT = 8080
-const GLOBAL_AGGREGATOR_ROUNDS = 100
-const GLOBAL_AGGREGATOR_SERVING_PORT = 8000
-const GLOBAL_AGGREGATOR_SERVING_NODE_PORT = 30080
-const GLOBAL_AGGREGATOR_SERVING_DEPLOYMENT_PREFIX = "fl-ga-serving"
-const GLOBAL_AGGREGATOR_SERVING_CONFIG_MAP_PREFIX = "fl-ga-serving-cm"
-const GLOBAL_AGGREGATOR_SERVING_SERVICE_PREFIX = "fl-ga-serving-svc"
+// Internal ports
+const FL_AGG_PORT = 8080
+const INF_SERVICE_PORT = 8000
+const INF_PROXY_PORT = 80
 
-// LA configs
-const LOCAL_AGGRETATOR_DEPLOYMENT_PREFIX = "fl-la"
-const LOCAL_AGGRETATOR_MOUNT_PATH = "/home/"
-const LOCAL_AGGREGATOR_SERVICE_PREFIX = "fl-la-svc"
-const LOCAL_AGGREGATOR_CONFIG_MAP_PREFIX = "fl-la-cm"
-const LOCAL_AGGREGATOR_PERSISTENT_VOLUME_PREFIX = "fl-la-pv"
-const LOCAL_AGGREGATOR_PERSISTENT_VOLUME_CLAIM_PREFIX = "fl-la-pvc"
-const LOCAL_AGGREGATOR_PORT = 8080
-const LOCAL_AGGREGATOR_ROUNDS = 100
-const LOCAL_AGGREGATOR_SERVING_PORT = 8000
-const LOCAL_AGGREGATOR_SERVING_NODE_PORT = 30180
-const LOCAL_AGGREGATOR_SERVING_DEPLOYMENT_PREFIX = "fl-la-serving"
-const LOCAL_AGGREGATOR_SERVING_CONFIG_MAP_PREFIX = "fl-la-serving-cm"
-const LOCAL_AGGREGATOR_SERVING_SERVICE_PREFIX = "fl-la-serving-svc"
-
-// Persistent Volume path
-const PERSISTENT_VOLUME_PATH = "/mnt/aiotwin/hfl_model"
+// Persistent volume
+const BASE_PV_PATH = "/mnt/aiotwin/pv"
+const PVC_STORAGE_SIZE = "2Gi"
 
 // FL types
 const FL_TYPE_CLIENT = "client"

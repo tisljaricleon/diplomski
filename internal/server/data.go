@@ -18,18 +18,26 @@ func fromJSON(i interface{}, r io.Reader) error {
 }
 
 type StartFlRequest struct {
-	Epochs             int32                  `json:"epochs"`
-	LocalRounds        int32                  `json:"localRounds"`
-	TrainingParams     TrainingParams         `json:"trainingParams"`
-	ModelSize          float32                `json:"modelSize"`
-	CostSource         cost.CostSource        `json:"costSource"`
-	CostConfiguration  cost.CostConfiguration `json:"costConfiguration" `
-	ConfigurationModel string                 `json:"configurationModel"`
-	RvaEnabled         bool                   `json:"rvaEnabled"`
-    EnableServing      bool                   `json:"enableServing"`
+	TrainingParams      TrainingParams         `json:"trainingParams"`
+	InferenceParams     InferenceParams        `json:"inferenceParams"`
+	ModelSize           float32                `json:"modelSize"`
+	CostSource          cost.CostSource        `json:"costSource"`
+	CostConfiguration   cost.CostConfiguration `json:"costConfiguration"`
+	ConfigurationModel  string                 `json:"configurationModel"`
+	RvaEnabled          bool                   `json:"rvaEnabled"`
 }
 
 type TrainingParams struct {
-	BatchSize    int32   `json:"batchSize"`
-	LearningRate float32 `json:"learningRate"`
+	Epochs              int32   `json:"epochs"`
+	LocalRounds         int32   `json:"localRounds"`
+	GlobalRounds        int32   `json:"globalRounds"`
+	MinFitClients       int32   `json:"minFitClients"`
+	MinEvaluateClients  int32   `json:"minEvaluateClients"`
+	MinAvailableClients int32   `json:"minAvailableClients"`
+	BatchSize           int32   `json:"batchSize"`
+	LearningRate        float32 `json:"learningRate"`
+}
+
+type InferenceParams struct {
+	EnableServing bool `json:"enableServing"`
 }

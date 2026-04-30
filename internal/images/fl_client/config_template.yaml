@@ -1,0 +1,11 @@
+server:
+  address: "%s"
+
+node_config:
+  partition-id: %d
+  num-partitions: %d
+
+run_config:
+  local-epochs: %d
+  batch-size: %d
+  learning-rate: %f

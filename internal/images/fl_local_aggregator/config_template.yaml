@@ -1,0 +1,11 @@
+server:
+  global_address: "%s"
+  local_address: "0.0.0.0:%d"
+  local_rounds: %d
+
+strategy:
+  fraction_fit: 1.0
+  fraction_evaluate: 1.0
+  min_fit_clients: %d
+  min_evaluate_clients: %d
+  min_available_clients: %d

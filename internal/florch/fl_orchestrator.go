@@ -1,13 +1,7 @@
 package florch
 
 import (
-	"bufio"
-	"encoding/csv"
 	"fmt"
-	"io"
-	"math"
-	"os"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,7 +12,6 @@ import (
 	"github.com/AIoTwin-Adaptive-FL-Orch/fl-orchestrator/internal/events"
 	"github.com/AIoTwin-Adaptive-FL-Orch/fl-orchestrator/internal/florch/cost"
 	"github.com/AIoTwin-Adaptive-FL-Orch/fl-orchestrator/internal/florch/flconfig"
-	"github.com/AIoTwin-Adaptive-FL-Orch/fl-orchestrator/internal/florch/performance"
 	"github.com/AIoTwin-Adaptive-FL-Orch/fl-orchestrator/internal/model"
 	"github.com/hashicorp/go-hclog"
 )
@@ -32,6 +25,10 @@ type FlOrchestrator struct {
 	nodesMap                 map[string]*model.Node
 	batchSize                int32
 	learningRate             float32
+	globalRounds             int32
+	minFitClients            int32
+	minEvaluateClients       int32
+	minAvailableClients      int32
 	configuration            *flconfig.FlConfiguration
 	modelSize                float32
 	costConfiguration        *cost.CostConfiguration
@@ -51,10 +48,9 @@ type FlProgress struct {
 	costPerGlobalRound   float32
 }
 
-var rememberRemovedClientsIDS []int
-
 func NewFlOrchestrator(contOrch contorch.IContainerOrchestrator, eventBus *events.EventBus, logger hclog.Logger,
-	configurationModelName string, epochs int32, localRounds int32, batchSize int32, learningRate float32,
+	configurationModelName string, epochs int32, localRounds int32, globalRounds int32, minFitClients int32, minEvaluateClients int32, minAvailableClients int32,
+	batchSize int32, learningRate float32,
 	modelSize float32, costSource cost.CostSource, costConfiguration *cost.CostConfiguration, rvaEnabled bool, enableServing bool) (*FlOrchestrator, error) {
 	orch := &FlOrchestrator{
 		contOrch:                 contOrch,
@@ -62,6 +58,10 @@ func NewFlOrchestrator(contOrch contorch.IContainerOrchestrator, eventBus *event
 		logger:                   logger,
 		batchSize:                batchSize,
 		learningRate:             learningRate,
+		globalRounds:             globalRounds,
+		minFitClients:            minFitClients,
+		minEvaluateClients:       minEvaluateClients,
+		minAvailableClients:      minAvailableClients,
 		modelSize:                modelSize,
 		costConfiguration:        costConfiguration,
 		costSource:               costSource,
@@ -72,9 +72,9 @@ func NewFlOrchestrator(contOrch contorch.IContainerOrchestrator, eventBus *event
 
 	switch configurationModelName {
 	case flconfig.MinimizeKld_ConfigModelName:
-		orch.configurationModel = flconfig.NewMinimizeKldConfiguration(epochs, localRounds)
+		orch.configurationModel = flconfig.NewMinimizeKldConfiguration(epochs, localRounds, globalRounds)
 	case flconfig.MinimizeCommCost_ConfigModelName:
-		orch.configurationModel = flconfig.NewMinimizeCommCostGreedyConfiguration(epochs, localRounds, modelSize)
+		orch.configurationModel = flconfig.NewMinimizeCommCostGreedyConfiguration(epochs, localRounds, globalRounds, modelSize)
 	case flconfig.Cent_Hier_ConfigModelName:
 		orch.configurationModel = flconfig.NewCentrHierFlConfiguration(modelSize, costConfiguration.Budget)
 	default:
@@ -84,6 +84,9 @@ func NewFlOrchestrator(contOrch contorch.IContainerOrchestrator, eventBus *event
 
 	return orch, nil
 }
+
+
+var rememberRemovedClientsIDS []int
 
 func (orch *FlOrchestrator) Start() error {
 	nodesMap, err := orch.contOrch.GetAvailableNodes(true)
@@ -161,17 +164,17 @@ func (orch *FlOrchestrator) Stop() {
 }
 
 func (orch *FlOrchestrator) deployFl() {
-	orch.deployGlobalAggregator(orch.configuration.GlobalAggregator)
-	/*if orch.enableServing {
-		orch.deployGlobalAggregatorServing(orch.configuration.GlobalAggregator)
-	}*/
+	orch.deployGlAgg(orch.configuration.GlobalAggregator)
+	if err := orch.deployGlAggInf(orch.configuration.GlobalAggregator); err != nil {
+		orch.logger.Error(fmt.Sprintf("Error while deploying global aggregator inference: %s", err.Error()))
+	}
 	time.Sleep(100 * time.Second)
 
 	for _, localAggregator := range orch.configuration.LocalAggregators {
-		orch.deployLocalAggregator(localAggregator)
-		/*if orch.enableServing {
-			orch.deployLocalAggregatorServing(localAggregator)
-		}*/
+		orch.deployLocAgg(localAggregator)
+		if err := orch.deployLocAggInf(localAggregator); err != nil {
+			orch.logger.Error(fmt.Sprintf("Error while deploying local aggregator inference for %s: %s", localAggregator.Id, err.Error()))
+		}
 		time.Sleep(1 * time.Second)
 	}
 	time.Sleep(60 * time.Second)
@@ -179,9 +182,9 @@ func (orch *FlOrchestrator) deployFl() {
 	for _, client := range orch.configuration.Clients {
 		client.BatchSize = orch.batchSize
 		client.LearningRate = orch.learningRate
-		orch.deployFlClient(client)
-		if orch.enableServing {
-			orch.deployFlClientServing(client)
+		orch.deployClient(client)
+		if err := orch.deployClientInf(client); err != nil {
+			orch.logger.Error(fmt.Sprintf("Error while deploying client inference for %s: %s", client.Id, err.Error()))
 		}
 		time.Sleep(1 * time.Second)
 	}
@@ -189,20 +192,23 @@ func (orch *FlOrchestrator) deployFl() {
 
 func (orch *FlOrchestrator) removeFl() {
 	for _, client := range orch.configuration.Clients {
-		orch.contOrch.RemoveFlClient(client)
-		if orch.enableServing {
-			orch.RemoveFlClientServing(client)
+		if err := orch.removeClientInf(client); err != nil {
+			orch.logger.Error(fmt.Sprintf("Error while removing client inference for %s: %s", client.Id, err.Error()))
 		}
+		orch.contOrch.RemoveClient(client)
 	}
 
 	for _, localAggregator := range orch.configuration.LocalAggregators {
-		orch.contOrch.RemoveLocalAggregator(localAggregator)
+		if err := orch.removeLocAggInf(localAggregator); err != nil {
+			orch.logger.Error(fmt.Sprintf("Error while removing local aggregator inference for %s: %s", localAggregator.Id, err.Error()))
+		}
+		orch.contOrch.RemoveLocAgg(localAggregator)
 	}
 
-	orch.contOrch.RemoveGlobalAggregator(orch.configuration.GlobalAggregator)
-	if orch.enableServing {
-		orch.RemoveGlobalAggregatorServing(orch.configuration.GlobalAggregator)
+	if err := orch.removeGlAggInf(orch.configuration.GlobalAggregator); err != nil {
+		orch.logger.Error(fmt.Sprintf("Error while removing global aggregator inference: %s", err.Error()))
 	}
+	orch.contOrch.RemoveGlAgg(orch.configuration.GlobalAggregator)
 }
 
 func (orch *FlOrchestrator) reconfigure(newConfiguration *flconfig.FlConfiguration) {
@@ -221,10 +227,16 @@ func (orch *FlOrchestrator) reconfigure(newConfiguration *flconfig.FlConfigurati
 		}
 		newClient := common.GetClientInArray(newConfiguration.Clients, oldClient.Id)
 		if (newClient == &model.FlClient{}) {
-			orch.contOrch.RemoveFlClient(oldClient)
+			if err := orch.removeClientInf(oldClient); err != nil {
+				orch.logger.Error(fmt.Sprintf("Error while removing client inference for %s: %s", oldClient.Id, err.Error()))
+			}
+			orch.contOrch.RemoveClient(oldClient)
 			orch.logger.Info(fmt.Sprintf("Removed client: %s", oldClient.Id))
 		} else if oldClient.ParentNodeId != newClient.ParentNodeId {
-			orch.contOrch.RemoveFlClient(oldClient)
+			if err := orch.removeClientInf(oldClient); err != nil {
+				orch.logger.Error(fmt.Sprintf("Error while removing client inference for %s: %s", oldClient.Id, err.Error()))
+			}
+			orch.contOrch.RemoveClient(oldClient)
 			orch.logger.Info(fmt.Sprintf("Client changing cluster: %s", oldClient.Id))
 		}
 	}
@@ -244,539 +256,23 @@ func (orch *FlOrchestrator) reconfigure(newConfiguration *flconfig.FlConfigurati
 		newClient.LearningRate = orch.learningRate
 		oldClient := common.GetClientInArray(oldConfiguration.Clients, newClient.Id)
 		if (oldClient == &model.FlClient{}) {
-			orch.deployFlClient(newClient)
+			if err := orch.deployClient(newClient); err != nil {
+				orch.logger.Error(fmt.Sprintf("Error while deploying client %s: %s", newClient.Id, err.Error()))
+				continue
+			}
+			if err := orch.deployClientInf(newClient); err != nil {
+				orch.logger.Error(fmt.Sprintf("Error while deploying client inference for %s: %s", newClient.Id, err.Error()))
+			}
 		} else if oldClient.ParentAddress != newClient.ParentAddress {
-			orch.deployFlClient(newClient)
+			if err := orch.deployClient(newClient); err != nil {
+				orch.logger.Error(fmt.Sprintf("Error while deploying client %s: %s", newClient.Id, err.Error()))
+				continue
+			}
+			if err := orch.deployClientInf(newClient); err != nil {
+				orch.logger.Error(fmt.Sprintf("Error while deploying client inference for %s: %s", newClient.Id, err.Error()))
+			}
 		}
 	}
 
 	orch.configuration = newConfiguration
-}
-
-func (orch *FlOrchestrator) deployGlobalAggregator(flAggregator *model.FlAggregator) error {
-	globalAggregatorConfigFilesData, err := BuildGlobalAggregatorConfigFiles(flAggregator)
-	if err != nil {
-		orch.logger.Error(fmt.Sprintf("Error while initializing global aggregator config files: %s", err.Error()))
-		return err
-	}
-
-	if err := orch.contOrch.CreateGlobalAggregator(flAggregator, globalAggregatorConfigFilesData); err != nil {
-		orch.logger.Error(fmt.Sprintf("Error while deploying global aggregator: %s", err.Error()))
-		return err
-	}
-
-	orch.logger.Info("Global aggregator deployed!")
-
-	return nil
-}
-
-func (orch *FlOrchestrator) deployGlobalAggregatorServing(flAggregator *model.FlAggregator) error {
-	globalAggregatorServingConfigData, err := BuildGlobalAggregatorServingConfigFiles()
-	if err != nil {
-		orch.logger.Error(fmt.Sprintf("Error while initializing global aggregator serving config files: %s", err.Error()))
-		return err
-	}
-
-	if err := orch.contOrch.CreateGlobalAggregatorServing(flAggregator, globalAggregatorServingConfigData); err != nil {
-		orch.logger.Error(fmt.Sprintf("Error while deploying global aggregator serving: %s", err.Error()))
-		return err
-	}
-
-	orch.logger.Info("Global aggregator serving deployed!")
-
-	return nil
-}
-
-func (orch *FlOrchestrator) deployLocalAggregator(flAggregator *model.FlAggregator) error {
-	localAggregatorConfigFilesData, err := BuildLocalAggregatorConfigFiles(flAggregator)
-	if err != nil {
-		orch.logger.Error(fmt.Sprintf("Error while initializing local aggregator config files: %s", err.Error()))
-		return err
-	}
-
-	if err := orch.contOrch.CreateLocalAggregator(flAggregator, localAggregatorConfigFilesData); err != nil {
-		orch.logger.Error(fmt.Sprintf("Error while deploying local aggregator: %s", err.Error()))
-		return err
-	}
-
-	orch.logger.Info("Local aggregator deployed!")
-
-	return nil
-}
-
-/*
-func (orch *FlOrchestrator) deployLocalAggregatorServing(flAggregator *model.FlAggregator) error {
-	localAggregatorServingConfigData, err := BuildLocalAggregatorServingConfigFiles()
-	if err != nil {
-		orch.logger.Error(fmt.Sprintf("Error while initializing local aggregator serving config files: %s", err.Error()))
-		return err
-	}
-
-	if err := orch.contOrch.CreateLocalAggregatorServing(flAggregator, localAggregatorServingConfigData); err != nil {
-		orch.logger.Error(fmt.Sprintf("Error while deploying local aggregator serving: %s", err.Error()))
-		return err
-	}
-
-	orch.logger.Info("Local aggregator serving deployed!")
-
-	return nil
-}*/
-
-func (orch *FlOrchestrator) deployFlClient(client *model.FlClient) error {
-	clientConfigFilesData, err := BuildClientConfigFiles(client)
-	if err != nil {
-		orch.logger.Error(fmt.Sprintf("Error while initializing client %s config files: %s", client.Id, err.Error()))
-		return err
-	}
-
-	if err := orch.contOrch.CreateFlClient(client, clientConfigFilesData); err != nil {
-		orch.logger.Error(fmt.Sprintf("Error while creating client %s deployment: %s", client.Id, err.Error()))
-		return err
-	}
-
-	orch.logger.Info(fmt.Sprintf("Client %s deployed!", client.Id))
-
-	return nil
-}
-
-func (orch *FlOrchestrator) deployFlClientServing(client *model.FlClient) error {
-	clientServingConfigData, err := BuildClientServingConfigFiles()
-	if err != nil {
-		orch.logger.Error(fmt.Sprintf("Error while initializing client %s serving config files: %s", client.Id, err.Error()))
-		return err
-	}
-
-	if err := orch.contOrch.CreateFlClientServing(client, clientServingConfigData); err != nil {
-		orch.logger.Error(fmt.Sprintf("Error while creating client %s serving deployment: %s", client.Id, err.Error()))
-		return err
-	}
-
-	orch.logger.Info(fmt.Sprintf("Client %s serving deployed!", client.Id))
-
-	return nil
-}
-
-func (orch *FlOrchestrator) RemoveFlClientServing(client *model.FlClient) {
-    orch.contOrch.RemoveFlClientServing(client)
-}
-
-func (orch *FlOrchestrator) RemoveGlobalAggregatorServing(aggregator *model.FlAggregator) {
-    orch.contOrch.RemoveGlobalAggregatorServing(aggregator)
-}
-
-func (orch *FlOrchestrator) flFinishedHandler(eventChan <-chan events.Event) {
-	for event := range eventChan {
-		flFinishedEvent, ok := event.Data.(events.FlFinishedEvent)
-		if !ok {
-			orch.logger.Info("Invalid event data")
-			continue
-		}
-
-		orch.logger.Info(fmt.Sprintf("FL finished! Exit message: %s", flFinishedEvent.ExitMessage))
-		orch.removeFl()
-
-		return
-	}
-}
-
-func (orch *FlOrchestrator) nodeStateChangeHandler(eventChan <-chan events.Event) {
-	for event := range eventChan {
-		nodeStateChangeEvent, ok := event.Data.(events.NodeStateChangeEvent)
-		if !ok {
-			orch.logger.Info("Invalid event data")
-			continue
-		}
-
-		// Handle the event
-		orch.logger.Info("New event:")
-		orch.logger.Info(fmt.Sprintf("Nodes added: %v", nodeStateChangeEvent.NodesAdded))
-		orch.logger.Info(fmt.Sprintf("Node removed: %v", nodeStateChangeEvent.NodesRemoved))
-
-		for _, node := range nodeStateChangeEvent.NodesAdded {
-			orch.nodesMap[node.Id] = node
-		}
-
-		for _, node := range nodeStateChangeEvent.NodesRemoved {
-			delete(orch.nodesMap, node.Id)
-		}
-
-		orch.runReconfigurationModel()
-	}
-}
-
-func (orch *FlOrchestrator) runReconfigurationModel() {
-	finishedGlobalRound := orch.progress.globalRound - 2
-	newConfiguration := orch.configurationModel.GetOptimalConfiguration(nodesMapToArray(orch.nodesMap))
-	newConfigCost := cost.GetGlobalRoundCost(newConfiguration, orch.nodesMap, orch.modelSize, orch.costSource, rememberRemovedClientsIDS)
-
-	reconfigurationChangeCost := cost.GetReconfigurationChangeCost(orch.configuration, newConfiguration, orch.nodesMap, orch.modelSize, orch.costSource)
-	orch.logger.Info(fmt.Sprintf("Reconfiguration change cost: %.2f", reconfigurationChangeCost))
-
-	postReconfigurationCost := newConfigCost - orch.progress.costPerGlobalRound
-	orch.logger.Info(fmt.Sprintf("Post reconfiguration cost: %.2f", postReconfigurationCost))
-
-	if orch.rvaEnabled && orch.costSource == cost.COMMUNICATION {
-		if orch.costConfiguration.CostType == cost.TotalBudget_CostType {
-			budgetRemaning := orch.costConfiguration.Budget - orch.progress.currentCost
-			roundsRemainingCurrent := math.Floor(float64(budgetRemaning / orch.progress.costPerGlobalRound))
-			roundsRemainingNew := math.Floor(float64((budgetRemaning - reconfigurationChangeCost) / newConfigCost))
-			if roundsRemainingNew < roundsRemainingCurrent {
-				ppCurrent := performance.NewPerformancePrediction(orch.progress.accuracies, orch.progress.losses,
-					performance.LogarithmicRegression_PredictionType, 0)
-				orch.reconfigurationEvaluator = &ReconfigurationEvaluator{
-					isActive:          true,
-					evaluationRound:   finishedGlobalRound + ReconfEvalWindow,
-					startAccuracy:     orch.progress.accuracies[len(orch.progress.accuracies)-1],
-					startLoss:         orch.progress.losses[len(orch.progress.losses)-1],
-					startConfig:       orch.configuration,
-					startPp:           ppCurrent,
-					startCostPerRound: orch.progress.costPerGlobalRound,
-					endConfig:         newConfiguration,
-					endPp:             ppCurrent,
-					endAccuracies:     []float32{},
-					endLosses:         []float32{},
-				}
-				orch.logger.Info(fmt.Sprintf("reconfiguration evaluation set for round: %d", orch.reconfigurationEvaluator.evaluationRound))
-			}
-		} else if orch.costConfiguration.CostType == cost.CostMinimization_CostType {
-			ppCurrent := performance.NewPerformancePrediction(orch.progress.accuracies, orch.progress.losses,
-				performance.LogarithmicRegression_PredictionType, 0)
-			roundPredicted := ppCurrent.PredictRoundForAccuracy(orch.costConfiguration.TargetAccuracy)
-			roundsRemainingCurrent := float32(roundPredicted - finishedGlobalRound)
-			costRemainingCurrent := float32(roundsRemainingCurrent) * orch.progress.costPerGlobalRound
-			roundsRemainingNew := (costRemainingCurrent - reconfigurationChangeCost) / newConfigCost
-			if roundsRemainingNew < roundsRemainingCurrent {
-				orch.reconfigurationEvaluator = &ReconfigurationEvaluator{
-					isActive:          true,
-					evaluationRound:   finishedGlobalRound + ReconfEvalWindow,
-					startAccuracy:     orch.progress.accuracies[len(orch.progress.accuracies)-1],
-					startLoss:         orch.progress.losses[len(orch.progress.losses)-1],
-					startConfig:       orch.configuration,
-					startPp:           ppCurrent,
-					startCostPerRound: orch.progress.costPerGlobalRound,
-					endConfig:         newConfiguration,
-					endPp:             ppCurrent,
-					endAccuracies:     []float32{},
-					endLosses:         []float32{},
-				}
-				orch.logger.Info(fmt.Sprintf("reconfiguration evaluation set for round: %d", orch.reconfigurationEvaluator.evaluationRound))
-			}
-		}
-	}
-
-	orch.progress.currentCost += reconfigurationChangeCost
-	orch.reconfigure(newConfiguration)
-}
-
-func (orch *FlOrchestrator) monitorFlProgress() {
-	for {
-	logsBuffer, err := orch.contOrch.GetGlobalAggregatorLogs(orch.configuration.GlobalAggregator.Id)
-		if err != nil {
-			orch.logger.Error(fmt.Sprintf("Error while obtaining GA logs: %s", err.Error()))
-			time.Sleep(1 * time.Second)
-			continue
-		}
-
-		logs := logsBuffer.String()
-		if strings.Contains(logs, fmt.Sprintf("fit_round %d:", orch.progress.globalRound)) {
-			finishedGlobalRound := orch.progress.globalRound - 1
-
-			orch.logger.Info(fmt.Sprintf("Finished global round %d", finishedGlobalRound))
-
-			accuracy := getLatestAccuracyFromLogs(logs)
-			orch.progress.accuracies = append(orch.progress.accuracies, accuracy)
-			orch.logger.Info(fmt.Sprintf("Latest accuracy: %.2f", accuracy))
-
-			loss := getLatestLossFromLogs(logs, finishedGlobalRound)
-			orch.progress.losses = append(orch.progress.losses, loss)
-			orch.logger.Info(fmt.Sprintf("Latest loss: %.2f", loss))
-
-			orch.progress.costPerGlobalRound = cost.GetGlobalRoundCost(orch.configuration, orch.nodesMap, orch.modelSize, orch.costSource, rememberRemovedClientsIDS)
-
-			if finishedGlobalRound > 0 {
-				orch.logger.Info(fmt.Sprintf("Cost per global round: %.2f", orch.progress.costPerGlobalRound))
-				orch.progress.currentCost += orch.progress.costPerGlobalRound
-				orch.logger.Info(fmt.Sprintf("Current total cost: %.2f", orch.progress.currentCost))
-
-				orch.progress.accuracyHasConverged = hasConverged(orch.progress.accuracies, 0.1, 5, 3)
-				if orch.progress.accuracyHasConverged {
-					orch.logger.Info("Accuracy has converged!")
-				}
-			}
-
-			orch.logger.Info(fmt.Sprintf("Started global round %d", orch.progress.globalRound))
-
-			writeResultsToFile(orch.resultsFileName, finishedGlobalRound, accuracy, loss, orch.progress.currentCost)
-
-			if orch.costConfiguration.CostType == cost.TotalBudget_CostType {
-				if orch.progress.currentCost >= orch.costConfiguration.Budget {
-					orch.logger.Info(fmt.Sprintf("Budget exceeded!\nTotal cost: %.2f\nFinal accuracy: %.2f",
-						orch.progress.currentCost, accuracy))
-					orch.removeFl()
-					break
-				}
-			} else if orch.costConfiguration.CostType == cost.CostMinimization_CostType {
-				if accuracy >= orch.costConfiguration.TargetAccuracy {
-					orch.logger.Info(fmt.Sprintf("Target accuracy reached!\nTotal cost: %.2f\nFinal accuracy: %.2f",
-						orch.progress.currentCost, accuracy))
-					orch.removeFl()
-					break
-				}
-			}
-
-			if orch.costSource == cost.COMMUNICATION {
-
-				if orch.reconfigurationEvaluator.isActive {
-					orch.reconfigurationEvaluator.endAccuracies = append(orch.reconfigurationEvaluator.endAccuracies, accuracy)
-					orch.reconfigurationEvaluator.endLosses = append(orch.reconfigurationEvaluator.endLosses, loss)
-
-					if finishedGlobalRound == orch.reconfigurationEvaluator.evaluationRound {
-						orch.evaluateReconfiguration()
-					}
-				}
-
-				if finishedGlobalRound == 10 {
-					orch.logger.Info("Applying changes...")
-					applyChanges("../../configs/cluster/cluster.csv", "../../configs/cluster/changes.csv")
-				}
-
-			}
-
-			if orch.costSource == cost.ENERGY {
-
-				orch.getDataDistributionPerClient()
-
-				if finishedGlobalRound > 0 {
-					orch.updateModelDifference()
-
-					sort.Slice(orch.configuration.Clients, func(i, j int) bool {
-						return orch.configuration.Clients[i].ClientUtility.ModelDifferenceScore < orch.configuration.Clients[j].ClientUtility.ModelDifferenceScore
-					})
-
-					clientsSortedPrint := fmt.Sprintln("Clients sorted by difference ascending ::")
-					for _, c := range orch.configuration.Clients {
-						clientsSortedPrint += fmt.Sprintf("\t%s: distr=%v diff)%.5f\n", c.Id, c.ClientUtility.DataDistribution,
-							c.ClientUtility.ModelDifferenceScore)
-					}
-
-					orch.logger.Info(clientsSortedPrint)
-				}
-
-				if finishedGlobalRound == 10 || finishedGlobalRound == 16 {
-					orch.logger.Info("Removing clients...")
-
-					lowestDifferenceClient := orch.configuration.Clients[0]
-					secondLowestDifferenceClient := orch.configuration.Clients[1]
-					fmt.Printf("LOWEST CLIENTS:\n")
-					fmt.Printf("%s\n", lowestDifferenceClient.Id)
-					fmt.Printf("%s\n", secondLowestDifferenceClient.Id)
-
-					fmt.Printf("Clients sorted by difference ascending ::")
-
-					newFlClients := []*model.FlClient{}
-					removeFlClients := []*model.FlClient{}
-
-					for _, client := range orch.configuration.Clients {
-						if client.Id == lowestDifferenceClient.Id || client.Id == secondLowestDifferenceClient.Id {
-							removeFlClients = append(removeFlClients, client)
-							cl_id, _ := parseClientID(client.Id)
-							rememberRemovedClientsIDS = append(rememberRemovedClientsIDS, cl_id)
-							continue
-						}
-						fmt.Printf("%s\n", client.Id)
-						fmt.Printf("Clients sorted by difference ascending ::")
-						newFlClients = append(newFlClients, client)
-					}
-
-					orch.contOrch.RemoveFlClient(removeFlClients[0])
-					orch.contOrch.RemoveFlClient(removeFlClients[1])
-
-					orch.configuration.Clients = newFlClients
-
-					nodesMap, err := orch.contOrch.GetAvailableNodes(true)
-					if err != nil {
-						orch.logger.Error(err.Error())
-
-					}
-					orch.nodesMap = nodesMap
-
-					fmt.Printf("BEFOREEE ::")
-					for _, client := range orch.configuration.Clients {
-						fmt.Printf("%s\n", client.Id)
-					}
-
-					orch.runReconfigurationModel()
-
-					fmt.Printf("NEW CONFIGGGGG!!!!!!::")
-					for _, client := range orch.configuration.Clients {
-						fmt.Printf("%s\n", client.Id)
-					}
-
-				}
-			}
-
-			orch.progress.globalRound++
-		}
-
-		time.Sleep(90 * time.Second)
-	}
-}
-
-func (orch *FlOrchestrator) printConfiguration() {
-	configToPrint := ""
-
-	configToPrint += fmt.Sprintln("Global aggregator ::")
-	globalAggregator := orch.configuration.GlobalAggregator
-	configToPrint += fmt.Sprintf("\tNode id:%s\t| Rounds:%d\n", globalAggregator.Id, globalAggregator.Rounds)
-	configToPrint += fmt.Sprintln("Local aggregators ::")
-	for _, a := range orch.configuration.LocalAggregators {
-		configToPrint += fmt.Sprintf("\tNode id:%s\t| Parent address:%s\t| Local rounds:%d Rounds:%d\n", a.Id, a.ParentAddress,
-			a.LocalRounds, a.Rounds)
-	}
-	configToPrint += fmt.Sprintln("Clients ::")
-	for _, c := range orch.configuration.Clients {
-		configToPrint += fmt.Sprintf("\tNode id:%s\t| Parent node:%s\t| Epochs:%d\n", c.Id, c.ParentNodeId, c.Epochs)
-	}
-	configToPrint += fmt.Sprintln("Epochs: ", orch.configuration.Epochs)
-	configToPrint += fmt.Sprintln("Local rounds: ", orch.configuration.LocalRounds)
-
-	orch.logger.Info(configToPrint)
-}
-
-// HELPERS
-
-func getLatestAccuracyFromLogs(logs string) float32 {
-	pattern := `accuracy': ([0-9]*\.[0-9]+)`
-	r := regexp.MustCompile(pattern)
-
-	matches := r.FindAllStringSubmatch(logs, -1)
-
-	if len(matches) > 0 {
-		latestMatch := matches[len(matches)-1]
-		accuracy, _ := strconv.ParseFloat(latestMatch[1], 32)
-		return float32(accuracy)
-	}
-
-	return -1.0
-}
-
-func getLatestLossFromLogs(logs string, finishedGlobalRound int32) float32 {
-	// Define the regex patterns
-	patterns := []string{
-		`\(loss, other metrics\): ([\d.]+),`,
-		`fit progress: \(\d+, ([\d.]+),`,
-	}
-
-	var re *regexp.Regexp
-	if finishedGlobalRound == 0 {
-		re = regexp.MustCompile(patterns[0])
-	} else {
-		re = regexp.MustCompile(patterns[1])
-	}
-
-	// Find all matches in the string
-	matches := re.FindAllStringSubmatch(logs, -1)
-
-	if len(matches) > 0 {
-		latestMatch := matches[len(matches)-1]
-		loss, _ := strconv.ParseFloat(latestMatch[1], 32)
-		return float32(loss)
-	}
-
-	return -1.0
-}
-
-func movingAverage(values []float32, windowSize int) []float32 {
-	if len(values) < windowSize {
-		return nil // Not enough data for the window size
-	}
-	averages := make([]float32, len(values)-windowSize+1)
-	for i := 0; i <= len(values)-windowSize; i++ {
-		sum := float32(0.0)
-		for j := i; j < i+windowSize; j++ {
-			sum += values[j]
-		}
-		averages[i] = sum / float32(windowSize)
-	}
-	return averages
-}
-
-func hasConverged(accuracies []float32, threshold float32, patience int, windowSize int) bool {
-	averages := movingAverage(accuracies, windowSize)
-	if len(averages) < patience+1 {
-		return false // Not enough data to determine convergence
-	}
-
-	for i := len(averages) - patience; i < len(averages); i++ {
-		improvement := averages[i] - averages[i-1]
-		if math.Abs(float64(improvement)) > float64(threshold) {
-			return false // If improvement is greater than the threshold, no convergence
-		}
-	}
-	return true // Converged if all improvements are below the threshold
-}
-
-func nodesMapToArray(nodesMap map[string]*model.Node) []*model.Node {
-	nodesArray := make([]*model.Node, 0, len(nodesMap))
-
-	for _, node := range nodesMap {
-		nodesArray = append(nodesArray, node)
-	}
-
-	return nodesArray
-}
-
-func getResultsFileName() string {
-	os.MkdirAll("../../experiments/results", 0777)
-	return fmt.Sprintf("../../experiments/results/results_%s.csv", time.Now().Format("2006-01-02_15-04"))
-}
-
-func writeResultsToFile(fileName string, round int32, accuracy float32, loss float32, cost float32) {
-	file, err := os.OpenFile(fileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		fmt.Printf("Failed to open file: %v\n", err)
-		return
-	}
-	defer file.Close()
-
-	// Create a CSV writer
-	writer := csv.NewWriter(file)
-	defer writer.Flush()
-
-	// Convert the float values to strings and store them in the CSV
-	record := []string{fmt.Sprintf("%d", round), fmt.Sprintf("%.2f", accuracy), fmt.Sprintf("%.2f", loss),
-		fmt.Sprintf("%.2f", cost)}
-	if err := writer.Write(record); err != nil {
-		fmt.Printf("Failed to write record: %v\n", err)
-		return
-	}
-}
-
-func applyChanges(clusterFileName string, changesFileName string) {
-	source, err := os.Open(changesFileName)
-	if err != nil {
-		fmt.Printf("Error opening source file: %v\n", err)
-		return
-	}
-	defer source.Close()
-
-	dest, err := os.OpenFile(clusterFileName, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		fmt.Printf("Error opening destination file: %v\n", err)
-		return
-	}
-	defer dest.Close()
-
-	if _, err = dest.WriteString("\n"); err != nil {
-		fmt.Printf("Error writing new line: %v\n", err)
-		return
-	}
-
-	reader := bufio.NewReader(source)
-	if _, err = io.Copy(dest, reader); err != nil {
-		fmt.Printf("Error appending content: %v\n", err)
-		return
-	}
-
-	fmt.Println("Content appended successfully.")
 }
