@@ -12,6 +12,9 @@ from torchvision.datasets import CIFAR10
 import torchvision.models as models
 
 
+DATASET_ROOT = os.environ.get("FL_DATASET_ROOT", "/home/model/dataset")
+
+
 def Net():
     model = models.resnet18(weights=None)
     model.fc = nn.Linear(model.fc.in_features, 10)
@@ -54,7 +57,8 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int, num_worke
         Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
 
-    full_dataset = CIFAR10(root="./dataset", train=True, download=True, transform=transform)
+    os.makedirs(DATASET_ROOT, exist_ok=True)
+    full_dataset = CIFAR10(root=DATASET_ROOT, train=True, download=True, transform=transform)
     full_dataset = Subset(full_dataset, range(50000))
     total_size = len(full_dataset)
 
