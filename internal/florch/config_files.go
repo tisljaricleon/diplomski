@@ -9,11 +9,12 @@ import (
 )
 
 const (
-	flConfigDirectoryPath = "../../configs/fl/"
-	imageDirectoryPath  = "../../internal/images/"
-	sharedTaskFileName    = "task.py"
-	sharedMainFileName    = "main.py"
-	sharedConfigFileName  = "config_template.yaml"
+	flConfigDirectoryPath      = "../../configs/fl/"
+	imageDirectoryPath         = "../../internal/images/"
+	sharedTaskFileName         = "task.py"
+	sharedMainFileName         = "main.py"
+	sharedConfigTemplateName   = "config_template.yaml"
+	sharedConfigFileName       = "config.yaml"
 )
 
 func BuildAggregatorConfigFiles(nodeType string, aggregator *model.FlAggregator) (map[string]string, error) {
@@ -28,7 +29,7 @@ func BuildAggregatorConfigFiles(nodeType string, aggregator *model.FlAggregator)
 		if err != nil {
 			return nil, err
 		}
-		configBytes, err := os.ReadFile(filepath.Join(imageDirectoryPath, "fl_global_aggregator", sharedConfigFileName))
+		configBytes, err := os.ReadFile(filepath.Join(imageDirectoryPath, "fl_global_aggregator", sharedConfigTemplateName))
 		if err != nil {
 			return nil, err
 		}
@@ -50,7 +51,7 @@ func BuildAggregatorConfigFiles(nodeType string, aggregator *model.FlAggregator)
 		if err != nil {
 			return nil, err
 		}
-		configBytes, err := os.ReadFile(filepath.Join(imageDirectoryPath, "fl_local_aggregator", sharedConfigFileName))
+		configBytes, err := os.ReadFile(filepath.Join(imageDirectoryPath, "fl_local_aggregator", sharedConfigTemplateName))
 		if err != nil {
 			return nil, err
 		}
@@ -82,7 +83,7 @@ func BuildClientConfigFiles(client *model.FlClient) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	configBytes, err := os.ReadFile(filepath.Join(imageDirectoryPath, "fl_client", sharedConfigFileName))
+	configBytes, err := os.ReadFile(filepath.Join(imageDirectoryPath, "fl_client", sharedConfigTemplateName))
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +108,7 @@ func BuildInfServiceConfigFiles(nodeType string) (map[string]string, error) {
 	}
 
 	infServingPath := filepath.Join(imageDirectoryPath, "inf_service")
-	configBytes, err := os.ReadFile(filepath.Join(infServingPath, sharedConfigFileName))
+	configBytes, err := os.ReadFile(filepath.Join(infServingPath, sharedConfigTemplateName))
 	if err != nil {
 		return nil, err
 	}

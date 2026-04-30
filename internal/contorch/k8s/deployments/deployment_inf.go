@@ -14,8 +14,7 @@ func BuildInfServiceDeployment(nodeId, pvcClaimName, namespace, image string, us
 	labelValue := fmt.Sprintf("serving-%s", nodeId)
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "servingconfig", MountPath: "/home/main.py", SubPath: "main.py"},
-		{Name: "servingconfig", MountPath: "/home/config.yaml", SubPath: "config.yaml"},
+		{Name: "servingconfig", MountPath: "/home"},
 		{Name: "modelstorage", MountPath: "/home/model"},
 	}
 	volumes := []corev1.Volume{

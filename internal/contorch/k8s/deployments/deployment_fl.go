@@ -38,9 +38,7 @@ func applyMPSRuntime(useMPS bool, volumeMounts []corev1.VolumeMount, volumes []c
 func BuildGlobalAggregatorDeployment(aggregator *model.FlAggregator, namespace string, image string, useMPS bool) *appsv1.Deployment {
 	volumeMounts, env, volumes := applyMPSRuntime(useMPS,
 		[]corev1.VolumeMount{
-			{Name: "gaconfig", MountPath: "/home/task.py", SubPath: "task.py"},
-			{Name: "gaconfig", MountPath: "/home/main.py", SubPath: "main.py"},
-			{Name: "gaconfig", MountPath: "/home/config.yaml", SubPath: "config.yaml"},
+			{Name: "gaconfig", MountPath: "/home"},
 			{Name: "modelstorage", MountPath: "/home/model"},
 		},
 		[]corev1.Volume{
@@ -114,7 +112,7 @@ func BuildGlobalAggregatorDeployment(aggregator *model.FlAggregator, namespace s
 func BuildLocalAggregatorDeployment(aggregator *model.FlAggregator, namespace string, image string, useMPS bool) *appsv1.Deployment {
 	volumeMounts, env, volumes := applyMPSRuntime(useMPS,
 		[]corev1.VolumeMount{
-			{Name: "laconfig", MountPath: "/home/config.yaml", SubPath: "config.yaml"},
+			{Name: "laconfig", MountPath: "/home"},
 			{Name: "modelstorage", MountPath: "/home/model"},
 		},
 		[]corev1.Volume{
@@ -188,9 +186,7 @@ func BuildLocalAggregatorDeployment(aggregator *model.FlAggregator, namespace st
 func BuildClientDeployment(client *model.FlClient, namespace string, image string, useMPS bool) *appsv1.Deployment {
 	volumeMounts, env, volumes := applyMPSRuntime(useMPS,
 		[]corev1.VolumeMount{
-			{Name: "clientconfig", MountPath: "/home/task.py", SubPath: "task.py"},
-			{Name: "clientconfig", MountPath: "/home/main.py", SubPath: "main.py"},
-			{Name: "clientconfig", MountPath: "/home/config.yaml", SubPath: "config.yaml"},
+			{Name: "clientconfig", MountPath: "/home"},
 			{Name: "modelstorage", MountPath: "/home/model"},
 		},
 		[]corev1.Volume{
