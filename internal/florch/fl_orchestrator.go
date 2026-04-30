@@ -100,6 +100,13 @@ func (orch *FlOrchestrator) Start() error {
 
 	// set cofiguration and deploy FL
 	orch.configuration = orch.configurationModel.GetOptimalConfiguration(nodesMapToArray(orch.nodesMap))
+	if orch.configuration.GlobalAggregator == nil || orch.configuration.GlobalAggregator.Id == "" {
+		return fmt.Errorf("no global aggregator node found; verify node labels include %s%s=%s", common.FlPrefix, common.FlTypeLabel, common.FL_TYPE_GLOBAL_AGGREGATOR)
+	}
+
+	if len(orch.configuration.Clients) == 0 {
+		return fmt.Errorf("no client nodes found; verify node labels include %s%s=%s", common.FlPrefix, common.FlTypeLabel, common.FL_TYPE_CLIENT)
+	}
 
 	if orch.costSource == cost.ENERGY {
 		fmt.Printf("Minimizing Energy Budget...")

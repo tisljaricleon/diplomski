@@ -133,12 +133,12 @@ func nodeCoreToNodeModel(nodeCore corev1.Node, nodeMetric v1beta1.NodeMetrics) *
 }
 
 func nodeLabelsToNodeModel(labels map[string]string, nodeModel *model.Node) {
-		flType := labels[common.FlTypeLabel]
-		numPartitions, _ := strconv.Atoi(labels[common.NumPartitionsLabel])
-		partitionId, _ := strconv.Atoi(labels[common.PartitionIdLabel])
-		imageType := labels[common.ImageTypeLabel]
-		useMPS := labels[common.UseMPSLabel] == "true"
-		proxyNodePort, _ := strconv.Atoi(labels[common.ProxyNodePortLabel])
+		flType := getLabelValue(labels, common.FlPrefix+common.FlTypeLabel, common.FlTypeLabel)
+		numPartitions, _ := strconv.Atoi(getLabelValue(labels, common.FlPrefix+common.NumPartitionsLabel, common.NumPartitionsLabel))
+		partitionId, _ := strconv.Atoi(getLabelValue(labels, common.FlPrefix+common.PartitionIdLabel, common.PartitionIdLabel))
+		imageType := getLabelValue(labels, common.CommonPrefix+common.ImageTypeLabel, common.ImageTypeLabel)
+		useMPS := getLabelValue(labels, common.CommonPrefix+common.UseMPSLabel, common.UseMPSLabel) == "true"
+		proxyNodePort, _ := strconv.Atoi(getLabelValue(labels, common.InfProxyPrefix+common.ProxyNodePortLabel, common.ProxyNodePortLabel))
 
 		communicationCosts := make(map[string]float32)
 		dataDistribution := make(map[string]int64)
@@ -327,8 +327,15 @@ func isNodeReady(nodeCore corev1.Node) bool {
 }
 
 func getFlType(labels map[string]string) string {
-	flType := labels[common.FlTypeLabel]
-	return flType
+	return getLabelValue(labels, common.FlPrefix+common.FlTypeLabel, common.FlTypeLabel)
+}
+
+func getLabelValue(labels map[string]string, namespacedKey string, fallbackKey string) string {
+	if value, exists := labels[namespacedKey]; exists {
+		return value
+	}
+
+	return labels[fallbackKey]
 }
 
 func getCommCostsAndDataDistribution(labels map[string]string) (map[string]float32, map[string]int64) {
