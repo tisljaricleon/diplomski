@@ -9,8 +9,9 @@ COPY requirements.txt /app/requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages -r /app/requirements.txt
 
 COPY http_server.py /app/http_server.py
-COPY nginx.conf /etc/nginx/nginx.conf
-COPY lua/proxy.lua /etc/nginx/lua/proxy.lua
+COPY nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
+RUN mkdir -p /usr/local/openresty/nginx/conf/lua
+COPY lua/proxy.lua /usr/local/openresty/nginx/conf/lua/proxy.lua
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 

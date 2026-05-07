@@ -33,3 +33,5 @@ cmd/log_reg/test.csv
 scripts/set_labels_*
 
 experiments/*
+
+/testing/

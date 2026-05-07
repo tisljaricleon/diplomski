@@ -10,11 +10,20 @@ import (
 
 func BuildInfProxyDeployment(nodeId, namespace, image, localServiceURL, parentServiceURL string) *appsv1.Deployment {
 	labelValue := "proxy-" + nodeId
-	volumeMounts := []corev1.VolumeMount{{
-		Name:      "proxyconfig",
-		MountPath: "/etc/nginx",
-		ReadOnly:  true,
-	}}
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "proxyconfig",
+			MountPath: "/usr/local/openresty/nginx/conf/nginx.conf",
+			SubPath:   "nginx.conf",
+			ReadOnly:  true,
+		},
+		{
+			Name:      "proxyconfig",
+			MountPath: "/usr/local/openresty/nginx/conf/lua/proxy.lua",
+			SubPath:   "lua/proxy.lua",
+			ReadOnly:  true,
+		},
+	}
 	volumes := []corev1.Volume{{
 		Name: "proxyconfig",
 		VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
