@@ -198,7 +198,7 @@ func GetInfSvcSvcName(nodeId string) string {
 }
 
 func GetInfSvcClusterAddress(nodeId string) string {
-	return fmt.Sprintf("%s:%s", GetInfSvcSvcName(nodeId), fmt.Sprint(INF_SERVICE_PORT))
+	return fmt.Sprintf("%s.default.svc.cluster.local:%s", GetInfSvcSvcName(nodeId), fmt.Sprint(INF_SERVICE_PORT))
 }
 
 // Inference proxy resource name helpers

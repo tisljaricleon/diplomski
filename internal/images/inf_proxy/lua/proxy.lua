@@ -26,7 +26,7 @@ if parent_service_url ~= "" then
     local http_client = http.new()
     http_client:set_timeout(500)
 
-    local training_response, training_error = http_client:request_uri("http://localhost:8001/trainingMetrics", { method = "GET" })
+    local training_response, training_error = http_client:request_uri("http://127.0.0.1:8001/trainingMetrics", { method = "GET" })
     if not (training_response and training_response.status == 200) then
         ngx.log(ngx.WARN, "[http server] Failed to fetch /trainingMetrics: ", training_error)
     else
@@ -36,7 +36,7 @@ if parent_service_url ~= "" then
         end
     end
 
-    local device_response, device_error = http_client:request_uri("http://localhost:8001/deviceMetrics", { method = "GET" })
+    local device_response, device_error = http_client:request_uri("http://127.0.0.1:8001/deviceMetrics", { method = "GET" })
     if not (device_response and device_response.status == 200) then
         ngx.log(ngx.WARN, "[http server] Failed to fetch /deviceMetrics: ", device_error)
     end
