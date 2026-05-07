@@ -6,6 +6,8 @@ local counter = ngx.shared.request_counter
 local local_service_url  = os.getenv("LOCAL_SERVICE_URL")  or ""
 local parent_service_url = os.getenv("PARENT_SERVICE_URL") or ""
 local max_inflight       = tonumber(os.getenv("MAX_INFLIGHT")) or 25
+local inflight           = counter:get("inflight") or 0
+local is_training        = false
 
 
 local target_url = nil
@@ -20,9 +22,6 @@ end
 
 
 if parent_service_url ~= "" then
-    local inflight = counter:get("inflight") or 0
-    local is_training = false
-
     local http_client = http.new()
     http_client:set_timeout(500)
 
@@ -36,6 +35,11 @@ if parent_service_url ~= "" then
         end
     end
 
+    -- Test mode: randomize training state per request to validate redirection behavior.
+    math.randomseed(ngx.now() * 1000 + ngx.worker.pid())
+    is_training = (math.random(0, 1) == 1)
+    ngx.log(ngx.WARN, "[proxy] randomized_is_training=", tostring(is_training))
+
     if is_training or inflight > max_inflight then
         target_url = parent_service_url
     end
@@ -43,7 +47,7 @@ if parent_service_url ~= "" then
 
 end
 
-ngx.log(ngx.WARN, "[proxy] target_url=", target_url, " inflight=", counter:get("inflight"), " is_training=", tostring(is_training))
+ngx.log(ngx.WARN, "[proxy] target_url=", target_url, " inflight=", inflight, " is_training=", tostring(is_training))
 
 
 counter:incr("inflight", 1, 0)
@@ -83,4 +87,4 @@ for k, v in pairs(upstream_request.headers) do
     end
 end
 
-ngx.say(upstream_request.body)
+ngx.print(upstream_request.body)
