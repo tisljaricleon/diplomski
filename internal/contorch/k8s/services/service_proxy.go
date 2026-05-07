@@ -8,11 +8,18 @@ import (
 )
 
 func BuildInfProxyService(nodeId string, nodePort int32) *corev1.Service {
-	servicePort := corev1.ServicePort{
+	proxyPort := corev1.ServicePort{
+		Name:       "http-proxy",
 		Port:       common.INF_PROXY_PORT,
 		TargetPort: intstr.FromInt(common.INF_PROXY_PORT),
 	}
-	servicePort.NodePort = nodePort
+	proxyPort.NodePort = nodePort
+
+	metricsPort := corev1.ServicePort{
+		Name:       "http-metrics",
+		Port:       common.INF_PROXY_SIDECAR_PORT,
+		TargetPort: intstr.FromInt(common.INF_PROXY_SIDECAR_PORT),
+	}
 
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: common.GetInfProxySvcName(nodeId)},
@@ -21,7 +28,7 @@ func BuildInfProxyService(nodeId string, nodePort int32) *corev1.Service {
 			Selector: map[string]string{
 				"fl": "proxy-" + nodeId,
 			},
-			Ports: []corev1.ServicePort{servicePort},
+			Ports: []corev1.ServicePort{proxyPort, metricsPort},
 		},
 	}
 }

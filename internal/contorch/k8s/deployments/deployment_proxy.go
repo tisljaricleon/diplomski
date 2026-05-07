@@ -44,7 +44,10 @@ func BuildInfProxyDeployment(nodeId, namespace, image, localServiceURL, parentSe
 					Containers: []corev1.Container{{
 						Name:         "inf-proxy",
 						Image:        image,
-						Ports:        []corev1.ContainerPort{{ContainerPort: common.INF_PROXY_PORT}},
+						Ports: []corev1.ContainerPort{
+							{ContainerPort: common.INF_PROXY_PORT},
+							{ContainerPort: common.INF_PROXY_SIDECAR_PORT},
+						},
 						VolumeMounts: volumeMounts,
 						Env:          env,
 						Resources: corev1.ResourceRequirements{
