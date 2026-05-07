@@ -1,9 +1,11 @@
 FROM openresty/openresty:1.29.2.3-bookworm-fat
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends python3 python3-pip lua-resty-http && \
+    apt-get install -y --no-install-recommends python3 python3-pip && \
     rm -f /etc/nginx/conf.d/default.conf && \
     rm -rf /var/lib/apt/lists/*
+
+RUN /usr/local/openresty/bin/opm get ledgetech/lua-resty-http
 
 COPY requirements.txt /app/requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages -r /app/requirements.txt
