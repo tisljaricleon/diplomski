@@ -5,7 +5,7 @@ local counter = ngx.shared.request_counter
 
 local local_service_url  = os.getenv("LOCAL_SERVICE_URL")  or ""
 local parent_service_url = os.getenv("PARENT_SERVICE_URL") or ""
-local max_inflight       = tonumber(os.getenv("MAX_INFLIGHT")) or 200
+local max_inflight       = tonumber(os.getenv("MAX_INFLIGHT")) or 25
 
 
 local target_url = nil
@@ -36,19 +36,14 @@ if parent_service_url ~= "" then
         end
     end
 
-    local device_response, device_error = http_client:request_uri("http://127.0.0.1:8001/deviceMetrics", { method = "GET" })
-    if not (device_response and device_response.status == 200) then
-        ngx.log(ngx.WARN, "[http server] Failed to fetch /deviceMetrics: ", device_error)
-    end
-
-    if is_training and inflight > 25 then
+    if is_training or inflight > max_inflight then
         target_url = parent_service_url
     end
 
 
 end
 
-ngx.log(ngx.WARN, "[proxy] target_url=", target_url, " inflight=", counter:get("inflight") or 0)
+ngx.log(ngx.WARN, "[proxy] target_url=", target_url, " inflight=", counter:get("inflight"), " is_training=", tostring(is_training))
 
 
 counter:incr("inflight", 1, 0)
@@ -88,4 +83,4 @@ for k, v in pairs(upstream_request.headers) do
     end
 end
 
-ngx.print(upstream_request.body)
+ngx.say(upstream_request.body)
