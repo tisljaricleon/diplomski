@@ -48,6 +48,8 @@ if parent_service_url ~= "" then
 
 end
 
+ngx.log(ngx.WARN, "[proxy] target_url=", target_url, " inflight=", counter:get("inflight") or 0)
+
 
 counter:incr("inflight", 1, 0)
 
@@ -74,6 +76,8 @@ if not upstream_request then
     ngx.say(cjson.encode({ error = "Upstream error: " .. upstream_error }))
     return
 end
+
+ngx.log(ngx.WARN, "[proxy] upstream_status=", upstream_request.status, " target_url=", target_url)
 
 
 ngx.status = upstream_request.status
