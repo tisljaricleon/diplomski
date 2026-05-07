@@ -1,7 +1,7 @@
 FROM openresty/openresty:1.29.2.3-bookworm-fat
 
 RUN apt-get update && \
-	apt-get install -y --no-install-recommends python3 python3-pip && \
+	apt-get install -y --no-install-recommends python3 python3-pip lua-resty-http && \
 	rm -f /etc/nginx/conf.d/default.conf && \
 	rm -rf /var/lib/apt/lists/*
 
