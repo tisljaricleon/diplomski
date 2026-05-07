@@ -1,12 +1,19 @@
 server:
-  global_address: "10.19.0.168:8080"
-  local_address: "0.0.0.0:8080"
-  local_rounds: 3
-  global_rounds: 2
+  address: "10.19.0.168:8081"
 
-strategy:
-  fraction_fit: 1.0
-  fraction_evaluate: 1.0
-  min_fit_clients: 2
-  min_evaluate_clients: 2
-  min_available_clients: 2
+node_config:
+  partition-id: 0
+  num-partitions: 4
+
+run_config:
+  batch-size: 32
+  local-epochs: 1
+  learning-rate: 0.1
+
+urls:
+  metric-server-url: "http://localhost:8001"
+
+paths:
+  dataset-dir: "/data"
+  model-file: "/model/model.pt"
+  state-file: "/model/state.json"

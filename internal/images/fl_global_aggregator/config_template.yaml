@@ -8,3 +8,10 @@ strategy:
   min_fit_clients: %d
   min_evaluate_clients: %d
   min_available_clients: %d
+
+urls:
+  metric-server-url: "%s"
+
+paths:
+  dataset-dir: "%s"
+  model-file: "%s"

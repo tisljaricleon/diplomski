@@ -1,5 +1,5 @@
 import yaml
-import argparse
+import torch
 import concurrent.futures
 import threading
 import flwr as fl
@@ -7,15 +7,13 @@ from flwr.common import parameters_to_ndarrays, ndarrays_to_parameters, Scalar, 
 from flwr.server.client_proxy import ClientProxy
 from typing import List, Tuple, Optional, Union, Dict
 import logging
+from task import load_model, save_model, set_weights, post_training_metrics
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 )
-
-logging.info("Training started")
-logging.warning("This is a warning")
 
 # --- Shared State ---
 class SharedState:
@@ -39,7 +37,9 @@ class SharedState:
 class FedAvgWithCheckpoint(fl.server.strategy.FedAvg):
     def __init__(self,
             shared_state: SharedState,
+            metrics_server_url: str,
             local_rounds: int,
+            model_file: str,
             fraction_fit: float = 1.0,
             fraction_evaluate: float = 1.0,
             min_fit_clients: int = 2,
@@ -54,7 +54,12 @@ class FedAvgWithCheckpoint(fl.server.strategy.FedAvg):
             min_available_clients=min_available_clients,
         )
         self.shared_state = shared_state
+        self.metrics_server_url = metrics_server_url
         self.local_rounds = local_rounds
+        self.model_file = model_file
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.net = load_model(model_file, self.device)
+        logging.info(f"[Local Aggregator] Using device: {self.device}")
 
     def initialize_parameters(self, client_manager):
         logging.info("[Local Aggregator] Waiting to initialize with global parameters.")
@@ -64,12 +69,39 @@ class FedAvgWithCheckpoint(fl.server.strategy.FedAvg):
         return self.shared_state.current_parameters
 
     def aggregate_fit(self, rnd, results, failures):
+        post_training_metrics(self.metrics_server_url, is_training=True)
         aggregated_result = super().aggregate_fit(rnd, results, failures)
         self.shared_state.local_round += 1
         self.shared_state.current_parameters = aggregated_result[0]
 
+        if aggregated_result[0] is not None:
+            set_weights(self.net, parameters_to_ndarrays(aggregated_result[0]))
+            save_model(self.net, self.model_file)
+
+        weighted_loss = 0.0
+        weighted_acc = 0.0
+        metric_examples = 0
         for _, fit_res in results:
             self.shared_state.num_examples += fit_res.num_examples
+            metrics = fit_res.metrics or {}
+            fit_loss = metrics.get("val_loss", metrics.get("loss"))
+            fit_acc = metrics.get("val_accuracy", metrics.get("accuracy"))
+            if fit_loss is not None and fit_acc is not None:
+                weighted_loss += float(fit_loss) * fit_res.num_examples
+                weighted_acc += float(fit_acc) * fit_res.num_examples
+                metric_examples += fit_res.num_examples
+
+        if metric_examples > 0:
+            self.shared_state.avg_loss = weighted_loss / metric_examples
+            self.shared_state.avg_acc = weighted_acc / metric_examples
+            post_training_metrics(
+                self.metrics_server_url,
+                is_training=False,
+                loss=self.shared_state.avg_loss,
+                accuracy=self.shared_state.avg_acc,
+            )
+        else:
+            post_training_metrics(self.metrics_server_url, is_training=False)
 
         if self.shared_state.local_round % self.local_rounds == 0:
             logging.info("[Aggregator] Completed local rounds. Syncing with global server...")
@@ -109,6 +141,7 @@ class FedAvgWithCheckpoint(fl.server.strategy.FedAvg):
         self.shared_state.test_num_examples = sum(examples)
         self.shared_state.test_avg_loss = float(aggregated_loss)
         self.shared_state.test_avg_acc = float(aggregated_accuracy)
+        post_training_metrics(self.metrics_server_url, is_training=False, loss=aggregated_loss, accuracy=aggregated_accuracy)
 
         return float(aggregated_loss), {"accuracy": float(aggregated_accuracy)}
 
@@ -158,7 +191,7 @@ class AggregatorParentConnection(fl.client.NumPyClient):
 
 # --- Aggregator ---
 class Aggregator:
-    def __init__(self, server_cfg, strategy_cfg):
+    def __init__(self, server_cfg, strategy_cfg, paths_cfg, metrics_server_url):
         self.shared_state = SharedState()
         logging.info("[Server Thread] Waiting for global parameters...")
         self.shared_state.server_lock.acquire()
@@ -168,10 +201,14 @@ class Aggregator:
         self.global_address = server_cfg["global_address"]
         self.local_rounds = server_cfg["local_rounds"]
         self.global_rounds = server_cfg["global_rounds"]
-
+        self.strategy_cfg = strategy_cfg
+        self.paths_cfg = paths_cfg
+        self.metrics_server_url = metrics_server_url
     def start(self):
-        strategy = FedAvgWithCheckpoint(self.shared_state, self.local_rounds, strategy_cfg["fraction_fit"],
-                strategy_cfg["fraction_evaluate"], strategy_cfg["min_fit_clients"], strategy_cfg["min_evaluate_clients"], strategy_cfg["min_available_clients"])
+        strategy = FedAvgWithCheckpoint(self.shared_state, self.metrics_server_url, self.local_rounds,
+                self.paths_cfg["model-file"],
+                self.strategy_cfg["fraction_fit"], self.strategy_cfg["fraction_evaluate"],
+                self.strategy_cfg["min_fit_clients"], self.strategy_cfg["min_evaluate_clients"], self.strategy_cfg["min_available_clients"])
 
         def run_client():
             AggregatorParentConnection(self.shared_state, self.global_address).start()
@@ -197,8 +234,28 @@ if __name__ == "__main__":
 
     server_cfg = config["server"]
     strategy_cfg = config["strategy"]
+    paths_cfg = config["paths"]
+    metrics_server_url = config["urls"]["metric-server-url"]
 
-    aggregator = Aggregator(server_cfg,
-            strategy_cfg
-    )
-    aggregator.start()
+    post_training_metrics(metrics_server_url, is_training=False)
+
+    aggregator = Aggregator(server_cfg, strategy_cfg, paths_cfg, metrics_server_url)
+    # Log parameters for visibility
+    logging.info("Parameters:")
+    logging.info(f"Global address: {server_cfg['global_address']}")
+    logging.info(f"Local address: {server_cfg['local_address']}")
+    logging.info(f"Local rounds: {server_cfg['local_rounds']}")
+    logging.info(f"Global rounds: {server_cfg['global_rounds']}")
+    logging.info(f"Fraction fit: {strategy_cfg['fraction_fit']}")
+    logging.info(f"Fraction evaluate: {strategy_cfg['fraction_evaluate']}")
+    logging.info(f"Min fit clients: {strategy_cfg['min_fit_clients']}")
+    logging.info(f"Min evaluate clients: {strategy_cfg['min_evaluate_clients']}")
+    logging.info(f"Min available clients: {strategy_cfg['min_available_clients']}")
+    logging.info(f"Dataset dir: {paths_cfg['dataset-dir']}")
+    logging.info(f"Model file: {paths_cfg['model-file']}")
+    logging.info(f"Metrics server URL: {metrics_server_url}")
+
+    try:
+        aggregator.start()
+    finally:
+        post_training_metrics(metrics_server_url, is_training=False)

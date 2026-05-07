@@ -13,15 +13,18 @@ type IContainerOrchestrator interface {
 
 	CreateGlAgg(aggregator *model.FlAggregator, configFiles map[string]string) error
 	RemoveGlAgg(aggregator *model.FlAggregator) error
-	GetGlAggLogs(aggregatorId string) (bytes.Buffer, error)
 	CreateLocAgg(aggregator *model.FlAggregator, configFiles map[string]string) error
 	RemoveLocAgg(aggregator *model.FlAggregator) error
-	GetLocAggLogs(aggregatorId string) (bytes.Buffer, error)
-
 	CreateClient(client *model.FlClient, configFiles map[string]string) error
 	RemoveClient(client *model.FlClient) error
+
+	GetLocAggLogs(aggregatorId string) (bytes.Buffer, error)
+	GetGlAggLogs(aggregatorId string) (bytes.Buffer, error)
 	GetClientLogs(clientId string) (bytes.Buffer, error)
 
 	CreateInfService(nodeType string, nodeId string, configFiles map[string]string) error
 	RemoveInfService(nodeId string) error
+
+	CreateInfProxy(nodeId string, configFiles map[string]string, parentServiceURL string) error
+	RemoveInfProxy(nodeId string) error
 }

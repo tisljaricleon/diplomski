@@ -15,7 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// FL node resources
+
 type flNodeResourceNames struct {
 	depName       string
 	svcName       string

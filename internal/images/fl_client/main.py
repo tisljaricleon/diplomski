@@ -1,12 +1,10 @@
 import yaml
-import os
-import csv
 import torch
 import flwr as fl
-from datetime import datetime
-from task import Net, get_weights, load_data, set_weights, test, train, load_model, save_model
+from task import Net, get_weights, load_data, set_weights, test, train, load_model, save_model, post_training_metrics
 import logging
 import time
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -14,68 +12,63 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 
-CSV_PATH = "/home/model/fl_data.csv"
-
-def log_to_csv(event, global_round=None, local_epoch=None, val_loss=None, val_accuracy=None, duration=None):
-    file_exists = os.path.exists(CSV_PATH)
-    os.makedirs(os.path.dirname(CSV_PATH), exist_ok=True)
-    with open(CSV_PATH, 'a', newline='') as f:
-        writer = csv.writer(f)
-        if not file_exists:
-            writer.writerow(["timestamp", "event", "global_round", "local_epoch", "val_loss", "val_accuracy", "duration_s"])
-        writer.writerow([datetime.now().isoformat(), event, global_round, local_epoch, val_loss, val_accuracy, duration])
-
 local_round = 1
+
+
 class FlowerClient(fl.client.NumPyClient):
-    def __init__(self, trainloader, valloader, local_epochs, learning_rate, partition_id):
+    def __init__(self, trainloader, valloader, local_epochs, learning_rate, partition_id, model_file, metrics_server_url):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        print(f"[INIT] Using device: {self.device}")
+        logging.info(f"[__init__, client {partition_id}] Using device: {self.device}")
+
         self.trainloader = trainloader
         self.valloader = valloader
         self.local_epochs = local_epochs
         self.lr = learning_rate
         self.partition_id = partition_id
-
-        model_path = "/home/model/model_resnet18.pt"
-        self.net = load_model(model_path, self.device)
+        self.model_file = model_file
+        self.metrics_server_url = metrics_server_url
+        self.net = load_model(self.model_file, self.device)
 
 
     def fit(self, parameters, config):
         global local_round
-        logging.info(f"[Client {self.partition_id}] Global round {local_round} started")
-        log_to_csv("GLOBAL_ROUND_START", global_round=local_round)
+        post_training_metrics(self.metrics_server_url, is_training=True)
+        logging.info(f"[fit, client {self.partition_id}] Global round {local_round} started")
         set_weights(self.net, parameters)
 
-        round_start = time.time()
-        results = train(
-            self.net,
-            self.trainloader,
-            self.valloader,
-            self.local_epochs,
-            self.lr,
-            self.device,
-            global_round=local_round,
-            log_fn=log_to_csv,
-        )
-        round_duration = time.time() - round_start
+        try:
+            round_start = time.time()
+            results = train(
+                self.net,
+                self.trainloader,
+                self.valloader,
+                self.local_epochs,
+                self.lr,
+                self.device,
+            )
+            round_duration = time.time() - round_start
 
-        model_path = "/home/model/model_resnet18.pt"
-        
-        save_model(self.net, model_path)
+            save_model(self.net, self.model_file)
+            post_training_metrics(
+                self.metrics_server_url,
+                is_training=False,
+                loss=results.get("val_loss"),
+                accuracy=results.get("val_accuracy"),
+            )
+            local_round += 1
+            logging.info(f"[fit, client {self.partition_id}] Global round {local_round} ended in {round_duration:.2f}s")
 
-        logging.info(f"[Client {self.partition_id}] Global round {local_round} ended in {round_duration:.2f}s")
-        log_to_csv("GLOBAL_ROUND_END", global_round=local_round,
-                   val_loss=results["val_loss"], val_accuracy=results["val_accuracy"],
-                   duration=round(round_duration, 2))
-
-        local_round += 1
-        return get_weights(self.net), len(self.trainloader.dataset), results
+            return get_weights(self.net), len(self.trainloader.dataset), results
+        except Exception:
+            post_training_metrics(self.metrics_server_url, is_training=False)
+            raise
 
 
     def evaluate(self, parameters, config):
         set_weights(self.net, parameters)
         loss, accuracy = test(self.net, self.valloader, self.device)
-        logging.info(f"[Client {self.partition_id}] test loss: {loss} , test accuracy: {accuracy} ")
+        logging.info(f"[evaluate, client {self.partition_id}] Test loss: {loss}, test accuracy: {accuracy}")
+        post_training_metrics(self.metrics_server_url, is_training=False, loss=loss, accuracy=accuracy)
         return loss, len(self.valloader.dataset), {"accuracy": accuracy,"loss":loss}
     
     
@@ -87,29 +80,37 @@ if __name__ == "__main__":
 
     partition_id = config["node_config"]["partition-id"]
     num_partitions = config["node_config"]["num-partitions"]
-
     batch_size = config["run_config"]["batch-size"]
     local_epochs = config["run_config"]["local-epochs"]
     learning_rate = config["run_config"]["learning-rate"]
-
+    dataset_dir = config["paths"]["dataset-dir"]
+    model_file = config["paths"]["model-file"]
     server_address = config["server"]["address"]
+    metrics_server_url = config["urls"]["metric-server-url"]
 
-    print("Parameters:")
-    print(f"Partition ID: {partition_id}")
-    print(f"Number of partitions: {num_partitions}")
-    print(f"Batch size: {batch_size}")
-    print(f"Local epochs: {local_epochs}")
-    print(f"Learning rate: {learning_rate}")
-    print(f"Server address: {server_address}")
-
-    print(f"Before loading partition in {time.time() - start:.2f} sec")
+    logging.info("Parameters:")
+    logging.info(f"Partition ID: {partition_id}")
+    logging.info(f"Number of partitions: {num_partitions}")
+    logging.info(f"Batch size: {batch_size}")
+    logging.info(f"Local epochs: {local_epochs}")
+    logging.info(f"Learning rate: {learning_rate}")
+    logging.info(f"Dataset path: {dataset_dir}")
+    logging.info(f"Model path: {model_file}")
+    logging.info(f"Server address: {server_address}")
+    logging.info(f"Metrics server URL: {metrics_server_url}")
+    post_training_metrics(metrics_server_url, is_training=False)
 
     start = time.time()
-    trainloader, valloader = load_data(partition_id, num_partitions, batch_size)
-    print(f"Loaded partition in {time.time() - start:.2f} sec")
+    trainloader, valloader = load_data(dataset_dir, partition_id, num_partitions, batch_size)
+    logging.info(f"Loaded partition in {time.time() - start:.2f}s")
 
-    logging.info("[FL] Federated learning started")
-    log_to_csv("FL_START")
-
-    client = FlowerClient(trainloader, valloader, local_epochs, learning_rate, partition_id).to_client()
+    client = FlowerClient(
+        trainloader,
+        valloader,
+        local_epochs,
+        learning_rate,
+        partition_id,
+        model_file,
+        metrics_server_url,
+    ).to_client()
     fl.client.start_numpy_client(server_address=server_address, client=client)

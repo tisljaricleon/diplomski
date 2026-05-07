@@ -13,7 +13,7 @@ func BuildInfServiceService(nodeId string) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: common.GetInfSvcSvcName(nodeId)},
 		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeNodePort,
+			Type: corev1.ServiceTypeClusterIP,
 			Selector: map[string]string{
 				"fl": fmt.Sprintf("serving-%s", nodeId),
 			},

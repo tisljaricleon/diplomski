@@ -206,10 +206,18 @@ func GetInfProxyDepName(nodeId string) string {
 	return fmt.Sprintf("%s-%s-%s", INF_PROXY_PREFIX, DEPLOYMENT_PREFIX, nodeId)
 }
 
+func GetInfProxyConfigMapName(nodeId string) string {
+	return fmt.Sprintf("%s-%s-%s", INF_PROXY_PREFIX, CONFIG_MAP_PREFIX, nodeId)
+}
+
 func GetInfProxySvcName(nodeId string) string {
 	return fmt.Sprintf("%s-%s-%s", INF_PROXY_PREFIX, SERVICE_PREFIX, nodeId)
 }
 
 func GetInfProxyClusterAddress(nodeId string) string {
 	return fmt.Sprintf("%s:%s", GetInfProxySvcName(nodeId), fmt.Sprint(INF_PROXY_PORT))
+}
+
+func GetInfProxyMetricsServerURL(nodeId string) string {
+	return fmt.Sprintf("http://%s:%d", GetInfProxySvcName(nodeId), INF_PROXY_SIDECAR_PORT)
 }

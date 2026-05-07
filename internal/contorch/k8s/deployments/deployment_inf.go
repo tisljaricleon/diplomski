@@ -28,6 +28,9 @@ func BuildInfServiceDeployment(nodeId, pvcClaimName, namespace, image string, us
 		{Name: "modelstorage", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvcClaimName}}},
 	}
 	env := []corev1.EnvVar{}
+	env = append(env,
+		corev1.EnvVar{Name: "FL_MODEL_FILE", Value: common.FL_MODEL_FILE},
+	)
 
 	if useMPS {
 		volumeMounts = append([]corev1.VolumeMount{
@@ -38,10 +41,10 @@ func BuildInfServiceDeployment(nodeId, pvcClaimName, namespace, image string, us
 			{Name: "mpspipe", VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/nvidia-mps"}}},
 			{Name: "mpslog", VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/nvidia-mps-log"}}},
 		}, volumes...)
-		env = []corev1.EnvVar{
-			{Name: "CUDA_MPS_PIPE_DIRECTORY", Value: "/tmp/nvidia-mps"},
-			{Name: "CUDA_MPS_LOG_DIRECTORY", Value: "/tmp/nvidia-mps-log"},
-		}
+		env = append(env,
+			corev1.EnvVar{Name: "CUDA_MPS_PIPE_DIRECTORY", Value: "/tmp/nvidia-mps"},
+			corev1.EnvVar{Name: "CUDA_MPS_LOG_DIRECTORY", Value: "/tmp/nvidia-mps-log"},
+		)
 	}
 
 	return &appsv1.Deployment{

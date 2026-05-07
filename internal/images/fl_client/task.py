@@ -1,6 +1,8 @@
 import os
 import logging
 import time
+import json
+import urllib.request
 from collections import OrderedDict
 import torch
 import torch.nn as nn
@@ -28,33 +30,61 @@ def set_weights(net, parameters):
     net.load_state_dict(state_dict, strict=True)
 
 
-def load_model(model_path, device):
+def load_model(model_file, device):
     net = Net()
-    if os.path.exists(model_path):
+    if os.path.exists(model_file):
         try:
-            net.load_state_dict(torch.load(model_path, map_location=device))
-            logging.info(f"[LOAD OR INIT] Loaded model weights from: {model_path}")
+            net.load_state_dict(torch.load(model_file, map_location=device))
+            logging.info(f"[load_model] Loaded model weights from {model_file}")
         except Exception as e:
-            logging.warning(f"[LOAD OR INIT] Failed to load model from {model_path}: {e}")
-            logging.info("[LOAD OR INIT] Initializing new model")
+            logging.error(f"[load_model] Failed to load model from {model_file}: {e}")
+            logging.info("[load_model] Initializing new model")
     else:
-        logging.info(f"[LOAD OR INIT] No model found at {model_path}"
-                     f"\n[LOAD OR INIT] Initializing new model")
+        logging.info(f"[load_model] No model found at {model_file}, initializing new model")
     return net
 
-def save_model(net, model_path):
-    os.makedirs(os.path.dirname(model_path), exist_ok=True)
-    torch.save(net.state_dict(), model_path)
-    logging.info(f"[SAVE MODEL] Model saved to {model_path}")
+
+def save_model(net, model_file):
+    os.makedirs(os.path.dirname(model_file), exist_ok=True)
+    torch.save(net.state_dict(), model_file)
+    logging.info(f"[save_model] Model saved to {model_file}")
+
+
+def post_training_metrics(metrics_server_url, is_training=None, loss=None, accuracy=None):
+    payload = {}
+    if is_training is not None:
+        payload["is_training"] = bool(is_training)
+    if loss is not None:
+        payload["loss"] = float(loss)
+    if accuracy is not None:
+        payload["accuracy"] = float(accuracy)
+    if not payload:
+        return
+
+    try:
+        endpoint = metrics_server_url + "/trainingMetrics"
+        request = urllib.request.Request(
+            endpoint,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=0.5):
+            pass
+        logging.info(f"[post_training_metrics] Posted metrics to {endpoint}: {payload}")
+    except Exception as e:
+        logging.warning(f"[post_training_metrics] Failed to post metrics: {e}")
     
 
-def load_data(partition_id: int, num_partitions: int, batch_size: int, num_workers: int = 4, pin_memory: bool = True):
+def load_data(dataset_dir: str, partition_id: int, num_partitions: int, batch_size: int, num_workers: int = 4, pin_memory: bool = True):
     transform = Compose([
         ToTensor(),
         Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
 
-    full_dataset = CIFAR10(root="./dataset", train=True, download=True, transform=transform)
+    os.makedirs(dataset_dir, exist_ok=True)
+    full_dataset = CIFAR10(root=dataset_dir, train=True, download=True, transform=transform)
+    full_dataset = Subset(full_dataset, range(50000))
     total_size = len(full_dataset)
 
     partition_size = total_size // num_partitions
@@ -68,35 +98,27 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int, num_worke
     test_size = len(partition_dataset) - train_size
     train_subset, test_subset = random_split(partition_dataset, [train_size, test_size], generator=torch.Generator().manual_seed(42))
 
-    trainloader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=pin_memory)
-    testloader = DataLoader(test_subset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=pin_memory)
+    trainloader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=pin_memory)
+    testloader = DataLoader(test_subset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=pin_memory)
 
     return trainloader, testloader
 
 
-
-
-def train(net, trainloader, valloader, epochs, learning_rate, device, global_round=None, log_fn=None):
-    """Train the model on the training set."""
-    net.to(device)  # move model to GPU if available
+def train(net, trainloader, valloader, epochs, learning_rate, device):
+    net.to(device)
     criterion = torch.nn.CrossEntropyLoss().to(device)
     optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9)
     net.train()
     for epoch in range(epochs):
         epoch_start = time.time()
-        logging.info(f"[Local Training] Epoch {epoch+1}/{epochs} started")
-        if log_fn:
-            log_fn("EPOCH_START", global_round=global_round, local_epoch=epoch+1)
+        logging.info(f"[train] Epoch {epoch+1}/{epochs} started")
         for batch in trainloader:
-            images = batch["img"]
-            labels = batch["label"]
+            images, labels = batch
             optimizer.zero_grad()
             criterion(net(images.to(device)), labels.to(device)).backward()
             optimizer.step()
         epoch_duration = time.time() - epoch_start
-        logging.info(f"[Local Training] Epoch {epoch+1}/{epochs} ended in {epoch_duration:.2f}s")
-        if log_fn:
-            log_fn("EPOCH_END", global_round=global_round, local_epoch=epoch+1, duration=round(epoch_duration, 2))
+        logging.info(f"[train] Epoch {epoch+1}/{epochs} ended in {epoch_duration:.2f}s")
 
     val_loss, val_acc = test(net, valloader, device)
 
@@ -108,14 +130,14 @@ def train(net, trainloader, valloader, epochs, learning_rate, device, global_rou
 
 
 def test(net, testloader, device):
-    """Validate the model on the test set."""
-    net.to(device)  # move model to GPU if available
+    net.to(device)
     criterion = torch.nn.CrossEntropyLoss()
     correct, loss = 0, 0.0
     with torch.no_grad():
         for batch in testloader:
-            images = batch["img"].to(device)
-            labels = batch["label"].to(device)
+            images, labels = batch
+            images = images.to(device)
+            labels = labels.to(device)
             outputs = net(images)
             loss += criterion(outputs, labels).item()
             correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()

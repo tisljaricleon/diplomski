@@ -15,9 +15,12 @@ const (
 	sharedMainFileName         = "main.py"
 	sharedConfigTemplateName   = "config_template.yaml"
 	sharedConfigFileName       = "config.yaml"
+	sharedNginxConfigFileName  = "nginx.conf"
+	sharedProxyLuaFileName     = "proxy.lua"
 )
 
 func BuildAggregatorConfigFiles(nodeType string, aggregator *model.FlAggregator) (map[string]string, error) {
+	metricsServerURL := common.GetInfProxyMetricsServerURL(aggregator.Id)
 	taskBytes, err := os.ReadFile(filepath.Join(flConfigDirectoryPath, "task", sharedTaskFileName))
 	if err != nil {
 		return nil, err
@@ -39,6 +42,9 @@ func BuildAggregatorConfigFiles(nodeType string, aggregator *model.FlAggregator)
 			aggregator.MinFitClients,
 			aggregator.MinEvaluateClients,
 			aggregator.MinAvailableClients,
+			metricsServerURL,
+			common.FL_DATASET_DIR,
+			common.FL_MODEL_FILE,
 		)
 		return map[string]string{
 			sharedTaskFileName:   string(taskBytes),
@@ -59,9 +65,13 @@ func BuildAggregatorConfigFiles(nodeType string, aggregator *model.FlAggregator)
 			aggregator.ParentAddress,
 			common.FL_AGG_PORT,
 			aggregator.LocalRounds,
+			aggregator.Rounds,
 			aggregator.MinFitClients,
 			aggregator.MinEvaluateClients,
 			aggregator.MinAvailableClients,
+			metricsServerURL,
+			common.FL_DATASET_DIR,
+			common.FL_MODEL_FILE,
 		)
 		return map[string]string{
 			sharedTaskFileName:   string(taskBytes),
@@ -75,6 +85,7 @@ func BuildAggregatorConfigFiles(nodeType string, aggregator *model.FlAggregator)
 }
 
 func BuildClientConfigFiles(client *model.FlClient) (map[string]string, error) {
+	metricsServerURL := common.GetInfProxyMetricsServerURL(client.Id)
 	taskBytes, err := os.ReadFile(filepath.Join(flConfigDirectoryPath, "task", sharedTaskFileName))
 	if err != nil {
 		return nil, err
@@ -94,6 +105,9 @@ func BuildClientConfigFiles(client *model.FlClient) (map[string]string, error) {
 		client.Epochs,
 		client.BatchSize,
 		client.LearningRate,
+		metricsServerURL,
+		common.FL_DATASET_DIR,
+		common.FL_MODEL_FILE,
 	)
 	return map[string]string{
 		sharedTaskFileName:   string(taskBytes),
@@ -102,29 +116,32 @@ func BuildClientConfigFiles(client *model.FlClient) (map[string]string, error) {
 	}, nil
 }
 
-func BuildInfServiceConfigFiles(nodeType string) (map[string]string, error) {
-	if !isValidNodeType(nodeType) {
-		return nil, fmt.Errorf("Unsupported node type: %s", nodeType)
-	}
-
+func BuildInfServiceConfigFiles() (map[string]string, error) {
 	infServingPath := filepath.Join(imageDirectoryPath, "inf_service")
-	configBytes, err := os.ReadFile(filepath.Join(infServingPath, sharedConfigTemplateName))
-	if err != nil {
-		return nil, err
-	}
-	config := fmt.Sprintf(string(configBytes), common.INF_SERVICE_PORT)
-
 	servingBytes, err := os.ReadFile(filepath.Join(infServingPath, sharedMainFileName))
 	if err != nil {
 		return nil, err
 	}
 
 	return map[string]string{
-		sharedMainFileName:   string(servingBytes),
-		sharedConfigFileName: config,
+		sharedMainFileName:	 string(servingBytes),
 	}, nil
 }
 
-func isValidNodeType(nodeType string) bool {
-	return nodeType == common.FL_TYPE_GLOBAL_AGGREGATOR || nodeType == common.FL_TYPE_LOCAL_AGGREGATOR || nodeType == common.FL_TYPE_CLIENT
+func BuildInfProxyConfigFiles() (map[string]string, error) {
+	infProxyPath := filepath.Join(imageDirectoryPath, "inf_proxy")
+	nginxConfigBytes, err := os.ReadFile(filepath.Join(infProxyPath, sharedNginxConfigFileName))
+	if err != nil {
+		return nil, err
+	}
+
+	proxyLuaBytes, err := os.ReadFile(filepath.Join(infProxyPath, "lua", sharedProxyLuaFileName))
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]string{
+		sharedNginxConfigFileName: string(nginxConfigBytes),
+		sharedProxyLuaFileName:    string(proxyLuaBytes),
+	}, nil
 }

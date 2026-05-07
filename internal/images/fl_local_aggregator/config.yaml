@@ -2,10 +2,18 @@ server:
   address: "10.19.0.168:8081"
 
 node_config:
-  partition-id: 0 
-  num-partitions: 4 
+  partition-id: 0
+  num-partitions: 4
 
 run_config:
   batch-size: 32
-  local-epochs: 1 
-  learning-rate: 0.1 
+  local-epochs: 1
+  learning-rate: 0.1
+
+urls:
+  metric-server-url: "http://localhost:8001"
+
+paths:
+  dataset-dir: "/data"
+  model-file: "/model/model.pt"
+  state-file: "/model/state.json"

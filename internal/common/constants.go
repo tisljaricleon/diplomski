@@ -46,10 +46,16 @@ const SERVICE_PREFIX = "svc"
 const FL_AGG_PORT = 8080
 const INF_SERVICE_PORT = 8000
 const INF_PROXY_PORT = 80
+const INF_PROXY_SIDECAR_PORT = 8001
 
 // Persistent volume
 const BASE_PV_PATH = "/mnt/aiotwin/pv"
 const PVC_STORAGE_SIZE = "2Gi"
+
+// Paths
+const FL_DATASET_DIR = "/home/model/dataset"
+const FL_STATE_FILE = "/home/model/state.json"
+const FL_MODEL_FILE = "/home/model/model.pt"
 
 // FL types
 const FL_TYPE_CLIENT = "client"

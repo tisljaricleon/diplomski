@@ -94,7 +94,6 @@ func (orch *K8sOrchestrator) RemoveInfService(nodeId string) error {
 	return nil
 }
 
-// Compatibility wrappers
 func (orch *K8sOrchestrator) CreateGlobalAggregatorServing(aggregator *model.FlAggregator, configFiles map[string]string) error {
 	return orch.CreateInfService(common.FL_TYPE_GLOBAL_AGGREGATOR, aggregator.Id, configFiles)
 }

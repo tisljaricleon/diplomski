@@ -9,3 +9,10 @@ run_config:
   local-epochs: %d
   batch-size: %d
   learning-rate: %f
+
+urls:
+  metric-server-url: "%s"
+
+paths:
+  dataset-dir: "%s"
+  model-file: "%s"

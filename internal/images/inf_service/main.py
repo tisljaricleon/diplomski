@@ -1,19 +1,30 @@
-import traceback
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 from PIL import Image
 import io
 import torch
 import os
-import yaml
+import logging
 from torchvision import transforms, models
 import torch.nn as nn
-import torch.nn.functional as F
 
 import asyncio
 import time
-from datetime import datetime
 from typing import List
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+
+FL_MODEL_FILE = os.getenv("FL_MODEL_FILE", "/home/model/model.pt")
+LABEL_NAMES = [
+    "airplane", "automobile", "bird", "cat", "deer",
+    "dog", "frog", "horse", "ship", "truck"
+]
 
 
 cuda_available = torch.cuda.is_available()
@@ -32,30 +43,24 @@ def Net():
 
 
 def load_model():
-    model_path = "/home/model/model_resnet18.pt"
-    if not os.path.exists(model_path):
+    if not os.path.exists(FL_MODEL_FILE):
+        logging.info(f"[load_model] No model found at {FL_MODEL_FILE}")
         return None
     try:
-        print(f"[MODEL LOAD] Loading model from {model_path}")
-        state_dict = torch.load(model_path, map_location=torch.device('cpu'))
-        print(f"[MODEL LOAD] Loaded object type: {type(state_dict)}")
+        logging.info(f"[load_model] Loading model from {FL_MODEL_FILE}")
+        state_dict = torch.load(FL_MODEL_FILE, map_location=torch.device('cpu'))
         model = Net()
         model.load_state_dict(state_dict)
         model.eval()
         model.to(device)
-        print(f"[MODEL LOAD] Model moved to device: {device}")
+        logging.info(f"[load_model] Model loaded and moved to device: {device}")
         return model
     except Exception as e:
-        print(f"[MODEL LOAD] Error: {e}")
+        logging.exception(f"[load_model] Error: {e}")
         return None
-
 
 model = load_model()
 
-LABEL_NAMES = [
-    "airplane", "automobile", "bird", "cat", "deer",
-    "dog", "frog", "horse", "ship", "truck"
-]
 
 def inference(tensor):
     with torch.no_grad():
@@ -64,30 +69,7 @@ def inference(tensor):
         return preds.cpu().numpy(), output.cpu().numpy()
 
 
-LIFECYCLE_LOG = "/home/model/lifecycle.log"
-
-
-def log_lifecycle(event: str):
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    pid = os.getpid()
-    msg = f"{ts},{pid},{event}\n"
-    print(f"[LIFECYCLE] {msg.strip()}")
-    with open(LIFECYCLE_LOG, "a") as f:
-        f.write(msg)
-
-
 app = FastAPI()
-
-
-@app.on_event("startup")
-async def on_startup():
-    log_lifecycle("STARTED")
-
-
-@app.on_event("shutdown")
-async def on_shutdown():
-    log_lifecycle("SHUTDOWN")
-
 @app.post("/predict")
 async def predict(files: List[UploadFile] = File(...)):
     global model
@@ -95,7 +77,7 @@ async def predict(files: List[UploadFile] = File(...)):
         if model is None:
             model = load_model()
         if model is None:
-            print("[PREDICT] Model not found")
+            logging.warning("[predict] Model not found")
             return JSONResponse({"results": None, "error": "Model not found"}, status_code=404)
 
         images = []
@@ -108,7 +90,7 @@ async def predict(files: List[UploadFile] = File(...)):
         start_time = time.time()
         preds, logits = await asyncio.to_thread(inference, batch_tensor)
         end_time = time.time()
-        print(f"[PREDICT] duration: {end_time - start_time:.4f}s")
+        logging.info(f"[predict] duration: {(end_time - start_time) * 1000:.2f}ms")
 
         probs = torch.nn.functional.softmax(torch.from_numpy(logits), dim=1).numpy()
         results = []
@@ -123,13 +105,11 @@ async def predict(files: List[UploadFile] = File(...)):
             })
         return JSONResponse({"results": results}, status_code=200)
     except Exception as e:
-        print(f"[PREDICT] {e}")
-        traceback.print_exc()
+        logging.exception(f"[predict] {e}")
         return JSONResponse({ "results": None, "error": str(e)}, status_code=500)
 
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
-    print(f"[GLOBAL EXCEPTION] {exc}")
-    traceback.print_exc()
+    logging.exception(f"[global_exception_handler] {exc}")
     return JSONResponse({"results": None, "error": str(exc)}, status_code=500)
