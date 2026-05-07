@@ -5,7 +5,7 @@ RUN apt-get update && \
 	rm -f /etc/nginx/conf.d/default.conf && \
 	rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --no-cache-dir fastapi "uvicorn[standard]"
+RUN pip3 install --no-cache-dir --break-system-packages fastapi "uvicorn[standard]"
 
 COPY http_server.py /app/http_server.py
 COPY nginx.conf /etc/nginx/nginx.conf
