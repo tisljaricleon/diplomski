@@ -37,6 +37,8 @@ type FlOrchestrator struct {
 	reconfigurationEvaluator *ReconfigurationEvaluator
 	rvaEnabled               bool
 	enableServing            bool
+	aomRoundsThreshold      int32
+	aomSelectionEnabled     bool
 }
 
 type FlProgress struct {
@@ -51,7 +53,8 @@ type FlProgress struct {
 func NewFlOrchestrator(contOrch contorch.IContainerOrchestrator, eventBus *events.EventBus, logger hclog.Logger,
 	configurationModelName string, epochs int32, localRounds int32, globalRounds int32, minFitClients int32, minEvaluateClients int32, minAvailableClients int32,
 	batchSize int32, learningRate float32,
-	modelSize float32, costSource cost.CostSource, costConfiguration *cost.CostConfiguration, rvaEnabled bool, enableServing bool) (*FlOrchestrator, error) {
+	modelSize float32, costSource cost.CostSource, costConfiguration *cost.CostConfiguration, rvaEnabled bool, enableServing bool,
+	aomRoundsThreshold int32, aomSelectionEnabled bool) (*FlOrchestrator, error) {
 	orch := &FlOrchestrator{
 		contOrch:                 contOrch,
 		eventBus:                 eventBus,
@@ -67,6 +70,8 @@ func NewFlOrchestrator(contOrch contorch.IContainerOrchestrator, eventBus *event
 		costSource:               costSource,
 		rvaEnabled:               rvaEnabled,
 		enableServing:            enableServing,
+		aomRoundsThreshold:      aomRoundsThreshold,
+		aomSelectionEnabled:     aomSelectionEnabled,
 		reconfigurationEvaluator: &ReconfigurationEvaluator{isActive: false},
 	}
 
@@ -100,6 +105,8 @@ func (orch *FlOrchestrator) Start() error {
 
 	// set cofiguration and deploy FL
 	orch.configuration = orch.configurationModel.GetOptimalConfiguration(nodesMapToArray(orch.nodesMap))
+	orch.configuration.GlobalAggregator.AomRoundsThreshold = orch.aomRoundsThreshold
+	orch.configuration.GlobalAggregator.AomSelectionEnabled = orch.aomSelectionEnabled
 	if orch.configuration.GlobalAggregator == nil || orch.configuration.GlobalAggregator.Id == "" {
 		return fmt.Errorf("no global aggregator node found; verify node labels include %s%s=%s", common.FlPrefix, common.FlTypeLabel, common.FL_TYPE_GLOBAL_AGGREGATOR)
 	}

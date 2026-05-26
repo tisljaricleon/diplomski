@@ -28,14 +28,16 @@ type StartFlRequest struct {
 }
 
 type TrainingParams struct {
-	Epochs              int32   `json:"epochs"`
-	LocalRounds         int32   `json:"localRounds"`
-	GlobalRounds        int32   `json:"globalRounds"`
-	MinFitClients       int32   `json:"minFitClients"`
-	MinEvaluateClients  int32   `json:"minEvaluateClients"`
-	MinAvailableClients int32   `json:"minAvailableClients"`
-	BatchSize           int32   `json:"batchSize"`
-	LearningRate        float32 `json:"learningRate"`
+	Epochs               int32   `json:"epochs"`
+	LocalRounds          int32   `json:"localRounds"`
+	GlobalRounds         int32   `json:"globalRounds"`
+	MinFitClients        int32   `json:"minFitClients"`
+	MinEvaluateClients   int32   `json:"minEvaluateClients"`
+	MinAvailableClients  int32   `json:"minAvailableClients"`
+	BatchSize            int32   `json:"batchSize"`
+	LearningRate         float32 `json:"learningRate"`
+	AomRoundsThreshold   int32   `json:"aomRoundsThreshold"`
+	AomSelectionEnabled  bool    `json:"aomSelectionEnabled"`
 }
 
 type InferenceParams struct {

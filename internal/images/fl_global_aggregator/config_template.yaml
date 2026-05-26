@@ -9,6 +9,7 @@ strategy:
   min-evaluate-clients: %d
   min-available-clients: %d
   aom-rounds-treshold: %d
+  aom-selection-enabled: %v
 
 urls:
   metric-server-url: "%s"

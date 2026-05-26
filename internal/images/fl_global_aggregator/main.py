@@ -15,7 +15,7 @@ logging.basicConfig(
 
 class LogAccuracyStrategy(FedAvg):
     def __init__(self, model_file, dataset_dir, metrics_server_url,
-                 aom_threshold_rounds,
+                 aom_threshold_rounds, aom_selection_enabled,
                  **kwargs):
         super().__init__(**kwargs)
         _, self.testloader = load_data(
@@ -30,6 +30,7 @@ class LogAccuracyStrategy(FedAvg):
         self.model_file = model_file
         self.metrics_server_url = metrics_server_url
         self.aom_threshold_rounds = aom_threshold_rounds
+        self.aom_selection_enabled = aom_selection_enabled
         self.net = load_model(model_file, self.device)
 
         self.last_client_participation: dict[str, int] = {}
@@ -46,6 +47,9 @@ class LogAccuracyStrategy(FedAvg):
         client_names = [client.cid for client in all_clients]
         logging.info(f"[configure_fit] Round {server_round}, clients available: {client_names}")
 
+        if not self.aom_selection_enabled:
+            sampled = client_manager.sample(num_clients=self.min_fit_clients, min_num_clients=self.min_available_clients)
+            return [(client, fit_ins) for client in sampled]
         selected_clients = []
         remaining_clients = []
         for client_proxy in all_clients:
@@ -115,6 +119,7 @@ if __name__ == "__main__":
     min_evaluate_clients = config["strategy"]["min-evaluate-clients"]
     min_available_clients = config["strategy"]["min-available-clients"]
     aom_threshold_rounds = config["strategy"]["aom-rounds-treshold"]
+    aom_selection_enabled = config["strategy"]["aom-selection-enabled"]
     server_address = config["server"]["address"]
     global_rounds = config["server"]["global-rounds"]
     model_file = config["paths"]["model-file"]
@@ -128,6 +133,7 @@ if __name__ == "__main__":
     logging.info(f"Min. evaluate clients: {min_evaluate_clients}")
     logging.info(f"Min. available clients: {min_available_clients}")
     logging.info(f"AoM threshold rounds: {aom_threshold_rounds}")
+    logging.info(f"AoM selection enabled: {aom_selection_enabled}")
     logging.info(f"Server address: {server_address}")
     logging.info(f"Global rounds: {global_rounds}")
     logging.info(f"Model path: {model_file}")
@@ -144,6 +150,7 @@ if __name__ == "__main__":
         dataset_dir=dataset_dir,
         metrics_server_url=metrics_server_url,
         aom_threshold_rounds=aom_threshold_rounds,
+        aom_selection_enabled=aom_selection_enabled,
         fraction_fit=fraction_fit,
         fraction_evaluate=fraction_evaluate,
         min_fit_clients=min_fit_clients,

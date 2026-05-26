@@ -25,4 +25,6 @@ type FlAggregator struct {
 	MinFitClients       int32
 	MinEvaluateClients  int32
 	MinAvailableClients int32
+	AomRoundsThreshold  int32
+	AomSelectionEnabled bool
 }

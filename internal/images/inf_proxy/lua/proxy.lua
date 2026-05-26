@@ -1,6 +1,6 @@
 local http    = require "resty.http"
 local cjson   = require "cjson.safe"
-local counter = ngx.shared.request_counter
+local counter = ngx.shared.inflight_60s_avg
 
 
 local local_service_url  = os.getenv("LOCAL_SERVICE_URL")  or ""
