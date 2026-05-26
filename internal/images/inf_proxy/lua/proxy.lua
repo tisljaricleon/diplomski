@@ -35,8 +35,8 @@ if parent_service_url ~= "" then
         end
     end
 
-    -- Test mode: randomize training state per request to validate redirection behavior.
-    math.randomseed(ngx.now() * 1000 + ngx.worker.pid())
+
+    math.randomseed(ngx.now() * 1000)
     is_training = (math.random(0, 1) == 1)
     ngx.log(ngx.WARN, "[proxy] randomized_is_training=", tostring(is_training))
 

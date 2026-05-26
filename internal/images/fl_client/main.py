@@ -1,4 +1,6 @@
 import yaml
+import json
+import urllib.request
 import torch
 import flwr as fl
 from task import Net, get_weights, load_data, set_weights, test, train, load_model, save_model, post_training_metrics
@@ -28,6 +30,17 @@ class FlowerClient(fl.client.NumPyClient):
         self.model_file = model_file
         self.metrics_server_url = metrics_server_url
         self.net = load_model(self.model_file, self.device)
+
+
+    def get_properties(self, config):
+        try:
+            req = urllib.request.Request(self.metrics_server_url + "/proxyMetrics")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                data = json.loads(resp.read()).get("data", {})
+            return {"inflight_60s_avg": float(data.get("inflight_60s_avg", 0.0))}
+        except Exception as e:
+            logging.warning(f"[get_properties, client {self.partition_id}] Failed to fetch proxy metrics: {e}")
+            return {"inflight_60s_avg": 0.0}
 
 
     def fit(self, parameters, config):

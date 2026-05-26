@@ -10,6 +10,7 @@ curl -X POST http://10.19.4.45:8080/fl/start \
       "minAvailableClients": 3,
       "batchSize": 32,
       "learningRate": 0.001
+      #config_template parametar koji definira kako se odabiru klijenti, da li po default FL-u ili po ovom
     },
     "inferenceParams": {
       "enableServing": true
