@@ -5,7 +5,7 @@ local counter = ngx.shared.inflight_60s_avg
 
 local local_service_url  = os.getenv("LOCAL_SERVICE_URL")  or ""
 local parent_service_url = os.getenv("PARENT_SERVICE_URL") or ""
-local max_inflight       = tonumber(os.getenv("MAX_INFLIGHT")) or 25
+local max_inflight       = tonumber(os.getenv("MAX_INFLIGHT")) or 150
 local inflight           = counter:get("inflight") or 0
 local is_training        = false
 
@@ -35,7 +35,7 @@ if parent_service_url ~= "" then
         end
     end
 
-    if is_training or inflight > max_inflight then
+    if is_training and inflight > max_inflight then
         target_url = parent_service_url
     end
 
