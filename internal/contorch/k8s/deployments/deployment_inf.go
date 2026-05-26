@@ -66,16 +66,16 @@ func BuildInfServiceDeployment(nodeId, pvcClaimName, namespace, image string, us
 						Ports:        []corev1.ContainerPort{{ContainerPort: common.INF_SERVICE_PORT}},
 						VolumeMounts: volumeMounts,
 						Env:          env,
-						Resources: corev1.ResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("0.2"),
-								corev1.ResourceMemory: resource.MustParse("256Mi"),
-							},
-							Limits: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("1.0"),
-								corev1.ResourceMemory: resource.MustParse("1Gi"),
-							},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1.0"),
+							corev1.ResourceMemory: resource.MustParse("2Gi"),
 						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("2.0"),
+							corev1.ResourceMemory: resource.MustParse("4Gi"),
+						},
+					},
 					}},
 					Volumes: volumes,
 				},

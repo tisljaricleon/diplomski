@@ -38,7 +38,6 @@ func (orch *K8sOrchestrator) getInfServiceRuntime(nodeId string) (string, bool, 
 		return "", false, err
 	}
 
-	
 	useMPS := node.Labels.Common.UseMPS
 	return image, useMPS, nil
 }
