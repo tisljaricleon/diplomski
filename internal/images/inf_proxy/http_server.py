@@ -77,7 +77,22 @@ def get_proxy_metrics():
         request = urllib.request.Request("http://127.0.0.1:80/proxy/status")
         with urllib.request.urlopen(request, timeout=0.5) as response:
             data = json.loads(response.read())
-        value = data.get("inflight_60s_avg")
-        return JSONResponse({"data": {"inflight_60s_avg": float(value) if value is not None else None}})
+        avg_value = data.get("inflight_60s_avg")
+        current_value = data.get("inflight_requests")
+        max_value = data.get("inflight_60s_max")
+
+        avg_num = float(avg_value) if avg_value is not None else 0.0
+        current_num = float(current_value) if current_value is not None else 0.0
+        max_num = float(max_value) if max_value is not None else 0.0
+        effective = max(avg_num, current_num, max_num)
+
+        return JSONResponse({
+            "data": {
+                "inflight_60s_avg": effective,
+                "inflight_requests": current_num,
+                "inflight_60s_max": max_num,
+                "inflight_60s_avg_raw": avg_num,
+            }
+        })
     except Exception:
         return JSONResponse({"data": {}, "error": "Failed to fetch proxy metrics"}, status_code=500)

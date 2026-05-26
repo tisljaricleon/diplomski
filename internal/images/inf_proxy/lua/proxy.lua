@@ -35,11 +35,6 @@ if parent_service_url ~= "" then
         end
     end
 
-
-    math.randomseed(ngx.now() * 1000)
-    is_training = (math.random(0, 1) == 1)
-    ngx.log(ngx.WARN, "[proxy] randomized_is_training=", tostring(is_training))
-
     if is_training or inflight > max_inflight then
         target_url = parent_service_url
     end
@@ -53,7 +48,7 @@ ngx.log(ngx.WARN, "[proxy] target_url=", target_url, " inflight=", inflight, " i
 counter:incr("inflight", 1, 0)
 
 local upstream_client = http.new()
-upstream_client:set_timeout(25000)
+upstream_client:set_timeout(60000)
 local body = ngx.req.get_body_data()
 local headers = ngx.req.get_headers()
 
