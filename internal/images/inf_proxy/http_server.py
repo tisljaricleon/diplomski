@@ -2,6 +2,7 @@ import logging
 import json
 import urllib.request
 import threading
+import time
 from threading import Lock
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -32,22 +33,36 @@ training_metrics: dict = {
 
 app = FastAPI()
 
+
+def _emit_proxy_log(level: str, message: str):
+    print(message, flush=True)
+    if level == "warning":
+        logging.warning(message)
+    else:
+        logging.info(message)
+
 def _proxy_metrics_logger():
+    _emit_proxy_log("info", "[proxy/status] periodic logger thread started")
     while True:
         try:
             req = urllib.request.Request("http://127.0.0.1:80/proxy/status")
             with urllib.request.urlopen(req, timeout=2.0) as resp:
                 data = json.loads(resp.read())
-            logging.info(
+            _emit_proxy_log(
+                "info",
                 f"[proxy/status] inflight={data.get('inflight_requests')} "
                 f"avg60s={data.get('inflight_60s_avg')} "
                 f"max60s={data.get('inflight_60s_max')}"
             )
         except Exception as e:
-            logging.warning(f"[proxy/status] fetch failed: {type(e).__name__}: {e}")
-        threading.Event().wait(5)
+            _emit_proxy_log("warning", f"[proxy/status] fetch failed: {type(e).__name__}: {e}")
+        time.sleep(5)
 
-threading.Thread(target=_proxy_metrics_logger, daemon=True, name="proxy-metrics-logger").start()
+
+@app.on_event("startup")
+def start_proxy_metrics_logger():
+    _emit_proxy_log("info", "[proxy/status] scheduling periodic logger thread")
+    threading.Thread(target=_proxy_metrics_logger, daemon=True, name="proxy-metrics-logger").start()
 
 @app.post("/trainingMetrics")
 async def set_training_metrics(request: Request):
