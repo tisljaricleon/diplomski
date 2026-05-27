@@ -11,7 +11,8 @@ curl -X POST http://10.19.4.45:8080/fl/start \
       "batchSize": 32,
       "learningRate": 0.001,
       "aomRoundsThreshold": 3,
-      "aomSelectionEnabled": true
+      "aomSelectionEnabled": true,
+      "inflightThreshold": 50.0
     },
     "inferenceParams": {
       "enableServing": true

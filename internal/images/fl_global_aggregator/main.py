@@ -15,7 +15,7 @@ logging.basicConfig(
 
 class LogAccuracyStrategy(FedAvg):
     def __init__(self, model_file, dataset_dir, metrics_server_url,
-                 aom_threshold_rounds, aom_selection_enabled,
+                 aom_threshold_rounds, aom_selection_enabled, inflight_threshold,
                  **kwargs):
         super().__init__(**kwargs)
         _, self.testloader = load_data(
@@ -31,6 +31,7 @@ class LogAccuracyStrategy(FedAvg):
         self.metrics_server_url = metrics_server_url
         self.aom_threshold_rounds = aom_threshold_rounds
         self.aom_selection_enabled = aom_selection_enabled
+        self.inflight_threshold = inflight_threshold
         self.net = load_model(model_file, self.device)
 
         self.last_client_participation: dict[str, int] = {}
@@ -50,8 +51,12 @@ class LogAccuracyStrategy(FedAvg):
         if not self.aom_selection_enabled:
             sampled = client_manager.sample(num_clients=self.min_fit_clients, min_num_clients=self.min_available_clients)
             return [(client, fit_ins) for client in sampled]
-        selected_clients = []
-        remaining_clients = []
+        # Bucket 1: AoM exceeded → always train regardless of load
+        # Bucket 2: low inflight (< threshold) → eligible
+        # Bucket 3: high inflight + recently trained → excluded unless needed
+        always_selected = []
+        eligible = []
+        excluded = []
         for client_proxy in all_clients:
             last_round = self.last_client_participation.get(client_proxy.cid, 0)
             aom = server_round - last_round
@@ -63,17 +68,21 @@ class LogAccuracyStrategy(FedAvg):
             except Exception as e:
                 logging.warning(f"[configure_fit] get_properties FAILED for {client_proxy.cid}: {type(e).__name__}: {e}")
                 inflight = 0.0
-            logging.info(f"[configure_fit] Client {client_proxy.cid}: AoM={aom}, inflight={inflight}")
+            logging.info(f"[configure_fit] Client {client_proxy.cid}: AoM={aom}, inflight={inflight}, threshold={self.inflight_threshold}")
 
             if aom > self.aom_threshold_rounds:
-                selected_clients.append((client_proxy, inflight))
+                always_selected.append((client_proxy, inflight))
+            elif inflight < self.inflight_threshold:
+                eligible.append((client_proxy, inflight))
             else:
-                remaining_clients.append((client_proxy, inflight))
+                excluded.append((client_proxy, inflight))
+
+        selected_clients = always_selected + eligible
 
         if len(selected_clients) < self.min_fit_clients:
             needed_clients = self.min_fit_clients - len(selected_clients)
-            remaining_clients.sort(key=lambda x: x[1])
-            selected_clients.extend(remaining_clients[:needed_clients])
+            excluded.sort(key=lambda x: x[1])
+            selected_clients.extend(excluded[:needed_clients])
 
         logging.info(
             f"[configure_fit] Round {server_round}, selected {len(selected_clients)}/{len(all_clients)} clients:"
@@ -122,6 +131,7 @@ if __name__ == "__main__":
     min_available_clients = config["strategy"]["min-available-clients"]
     aom_threshold_rounds = config["strategy"]["aom-rounds-treshold"]
     aom_selection_enabled = config["strategy"]["aom-selection-enabled"]
+    inflight_threshold = float(config["strategy"]["inflight-threshold"])
     server_address = config["server"]["address"]
     global_rounds = config["server"]["global-rounds"]
     model_file = config["paths"]["model-file"]
@@ -136,6 +146,7 @@ if __name__ == "__main__":
     logging.info(f"Min. available clients: {min_available_clients}")
     logging.info(f"AoM threshold rounds: {aom_threshold_rounds}")
     logging.info(f"AoM selection enabled: {aom_selection_enabled}")
+    logging.info(f"Inflight threshold: {inflight_threshold}")
     logging.info(f"Server address: {server_address}")
     logging.info(f"Global rounds: {global_rounds}")
     logging.info(f"Model path: {model_file}")
@@ -153,6 +164,7 @@ if __name__ == "__main__":
         metrics_server_url=metrics_server_url,
         aom_threshold_rounds=aom_threshold_rounds,
         aom_selection_enabled=aom_selection_enabled,
+        inflight_threshold=inflight_threshold,
         fraction_fit=fraction_fit,
         fraction_evaluate=fraction_evaluate,
         min_fit_clients=min_fit_clients,

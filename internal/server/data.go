@@ -38,6 +38,7 @@ type TrainingParams struct {
 	LearningRate         float32 `json:"learningRate"`
 	AomRoundsThreshold   int32   `json:"aomRoundsThreshold"`
 	AomSelectionEnabled  bool    `json:"aomSelectionEnabled"`
+	InflightThreshold    float32 `json:"inflightThreshold"`
 }
 
 type InferenceParams struct {

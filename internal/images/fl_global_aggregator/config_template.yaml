@@ -10,6 +10,7 @@ strategy:
   min-available-clients: %d
   aom-rounds-treshold: %d
   aom-selection-enabled: %v
+  inflight-threshold: %f
 
 urls:
   metric-server-url: "%s"

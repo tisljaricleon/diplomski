@@ -46,7 +46,7 @@ func (handler *Handler) StartFl(rw http.ResponseWriter, r *http.Request) {
 		request.TrainingParams.MinFitClients, request.TrainingParams.MinEvaluateClients, request.TrainingParams.MinAvailableClients,
 		request.TrainingParams.BatchSize, request.TrainingParams.LearningRate,
 		request.ModelSize, request.CostSource, &request.CostConfiguration, request.RvaEnabled, request.InferenceParams.EnableServing,
-		request.TrainingParams.AomRoundsThreshold, request.TrainingParams.AomSelectionEnabled)
+		request.TrainingParams.AomRoundsThreshold, request.TrainingParams.AomSelectionEnabled, request.TrainingParams.InflightThreshold)
 	if err != nil {
 		handler.logger.Error("erorr starting FL", "error", err)
 		rw.WriteHeader(http.StatusBadRequest)

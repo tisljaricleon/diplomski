@@ -27,4 +27,5 @@ type FlAggregator struct {
 	MinAvailableClients int32
 	AomRoundsThreshold  int32
 	AomSelectionEnabled bool
+	InflightThreshold   float32
 }
