@@ -49,6 +49,7 @@ def _proxy_metrics_logger():
 
 threading.Thread(target=_proxy_metrics_logger, daemon=True, name="proxy-metrics-logger").start()
 
+@app.post("/trainingMetrics")
 async def set_training_metrics(request: Request):
     update = await request.json()
     with training_lock:
