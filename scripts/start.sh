@@ -12,7 +12,7 @@ curl -X POST http://10.19.4.45:8080/fl/start \
       "learningRate": 0.001,
       "aomRoundsThreshold": 3,
       "aomSelectionEnabled": true,
-      "inflightThreshold": 50.0
+      "inflightThreshold": 10.0
     },
     "inferenceParams": {
       "enableServing": true
