@@ -42,7 +42,11 @@ if parent_service_url ~= "" then
 
 end
 
-ngx.log(ngx.WARN, "[proxy] target_url=", target_url, " inflight=", inflight, " is_training=", tostring(is_training))
+local last_target = counter:get("last_target") or ""
+if last_target ~= target_url then
+    ngx.log(ngx.WARN, "[proxy] SWITCHED ", last_target == "" and "(init)" or last_target, " -> ", target_url, " inflight=", inflight, " is_training=", tostring(is_training))
+    counter:set("last_target", target_url)
+end
 
 
 counter:incr("inflight", 1, 0)
@@ -70,8 +74,6 @@ if not upstream_request then
     ngx.say(cjson.encode({ error = "Upstream error: " .. upstream_error }))
     return
 end
-
-ngx.log(ngx.WARN, "[proxy] upstream_status=", upstream_request.status, " target_url=", target_url)
 
 
 ngx.status = upstream_request.status

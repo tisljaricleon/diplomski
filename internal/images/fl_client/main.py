@@ -37,9 +37,11 @@ class FlowerClient(fl.client.NumPyClient):
             req = urllib.request.Request(self.metrics_server_url + "/proxyMetrics")
             with urllib.request.urlopen(req, timeout=2) as resp:
                 data = json.loads(resp.read()).get("data", {})
-            return {"inflight_60s_avg": float(data.get("inflight_60s_avg", 0.0))}
+            value = float(data.get("inflight_60s_avg", 0.0))
+            logging.info(f"[get_properties, client {self.partition_id}] proxyMetrics raw={data} -> inflight_60s_avg={value}")
+            return {"inflight_60s_avg": value}
         except Exception as e:
-            logging.warning(f"[get_properties, client {self.partition_id}] Failed to fetch proxy metrics: {e}")
+            logging.warning(f"[get_properties, client {self.partition_id}] Failed to fetch proxy metrics: {type(e).__name__}: {e}")
             return {"inflight_60s_avg": 0.0}
 
 

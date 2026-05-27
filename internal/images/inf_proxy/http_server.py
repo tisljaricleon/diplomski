@@ -1,6 +1,7 @@
 import logging
 import json
 import urllib.request
+import threading
 from threading import Lock
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -30,7 +31,24 @@ training_metrics: dict = {
 
 
 app = FastAPI()
-@app.post("/trainingMetrics")
+
+def _proxy_metrics_logger():
+    while True:
+        try:
+            req = urllib.request.Request("http://127.0.0.1:80/proxy/status")
+            with urllib.request.urlopen(req, timeout=2.0) as resp:
+                data = json.loads(resp.read())
+            logging.info(
+                f"[proxy/status] inflight={data.get('inflight_requests')} "
+                f"avg60s={data.get('inflight_60s_avg')} "
+                f"max60s={data.get('inflight_60s_max')}"
+            )
+        except Exception as e:
+            logging.warning(f"[proxy/status] fetch failed: {type(e).__name__}: {e}")
+        threading.Event().wait(5)
+
+threading.Thread(target=_proxy_metrics_logger, daemon=True, name="proxy-metrics-logger").start()
+
 async def set_training_metrics(request: Request):
     update = await request.json()
     with training_lock:
@@ -75,7 +93,7 @@ def get_training_metrics():
 def get_proxy_metrics():
     try:
         request = urllib.request.Request("http://127.0.0.1:80/proxy/status")
-        with urllib.request.urlopen(request, timeout=0.5) as response:
+        with urllib.request.urlopen(request, timeout=2.0) as response:
             data = json.loads(response.read())
         avg_value = data.get("inflight_60s_avg")
         current_value = data.get("inflight_requests")
@@ -86,6 +104,8 @@ def get_proxy_metrics():
         max_num = float(max_value) if max_value is not None else 0.0
         effective = max(avg_num, current_num, max_num)
 
+        logging.info(f"[proxyMetrics] raw_avg={avg_num} current={current_num} max={max_num} -> effective={effective}")
+
         return JSONResponse({
             "data": {
                 "inflight_60s_avg": effective,
@@ -94,5 +114,6 @@ def get_proxy_metrics():
                 "inflight_60s_avg_raw": avg_num,
             }
         })
-    except Exception:
+    except Exception as e:
+        logging.error(f"[proxyMetrics] Failed to fetch proxy metrics from nginx /proxy/status: {e}")
         return JSONResponse({"data": {}, "error": "Failed to fetch proxy metrics"}, status_code=500)
