@@ -58,8 +58,10 @@ class LogAccuracyStrategy(FedAvg):
 
             try:
                 props = client_proxy.get_properties(GetPropertiesIns(config={}), timeout=2.0, group_id=None)
+                logging.info(f"[configure_fit] Client {client_proxy.cid}: raw properties={dict(props.properties)}")
                 inflight = float(props.properties.get("inflight_60s_avg", 0.0))
-            except Exception:
+            except Exception as e:
+                logging.warning(f"[configure_fit] get_properties FAILED for {client_proxy.cid}: {type(e).__name__}: {e}")
                 inflight = 0.0
             logging.info(f"[configure_fit] Client {client_proxy.cid}: AoM={aom}, inflight={inflight}")
 
