@@ -23,6 +23,12 @@ func BuildInfProxyDeployment(nodeId, namespace, image, localServiceURL, parentSe
 			SubPath:   "lua/proxy.lua",
 			ReadOnly:  true,
 		},
+		{
+			Name:      "proxyconfig",
+			MountPath: "/app/http_server.py",
+			SubPath:   "http_server.py",
+			ReadOnly:  true,
+		},
 	}
 	volumes := []corev1.Volume{{
 		Name: "proxyconfig",
@@ -31,6 +37,7 @@ func BuildInfProxyDeployment(nodeId, namespace, image, localServiceURL, parentSe
 			Items: []corev1.KeyToPath{
 				{Key: "nginx.conf", Path: "nginx.conf"},
 				{Key: "proxy.lua", Path: "lua/proxy.lua"},
+				{Key: "http_server.py", Path: "http_server.py"},
 			},
 		}},
 	}}

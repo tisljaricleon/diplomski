@@ -17,6 +17,7 @@ const (
 	sharedConfigFileName       = "config.yaml"
 	sharedNginxConfigFileName  = "nginx.conf"
 	sharedProxyLuaFileName     = "proxy.lua"
+	sharedHttpServerFileName   = "http_server.py"
 )
 
 func BuildAggregatorConfigFiles(nodeType string, aggregator *model.FlAggregator) (map[string]string, error) {
@@ -142,8 +143,14 @@ func BuildInfProxyConfigFiles() (map[string]string, error) {
 		return nil, err
 	}
 
+	httpServerBytes, err := os.ReadFile(filepath.Join(infProxyPath, sharedHttpServerFileName))
+	if err != nil {
+		return nil, err
+	}
+
 	return map[string]string{
 		sharedNginxConfigFileName: string(nginxConfigBytes),
 		sharedProxyLuaFileName:    string(proxyLuaBytes),
+		sharedHttpServerFileName:  string(httpServerBytes),
 	}, nil
 }
