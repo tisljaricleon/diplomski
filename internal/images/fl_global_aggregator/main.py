@@ -57,7 +57,7 @@ class LogAccuracyStrategy(FedAvg):
             aom = server_round - last_round
 
             try:
-                props = client_proxy.get_properties(GetPropertiesIns(config={}), timeout=2.0, group_id=None)
+                props = client_proxy.get_properties(GetPropertiesIns(config={}), timeout=2.0)
                 logging.info(f"[configure_fit] Client {client_proxy.cid}: raw properties={dict(props.properties)}")
                 inflight = float(props.properties.get("inflight_60s_avg", 0.0))
             except Exception as e:
