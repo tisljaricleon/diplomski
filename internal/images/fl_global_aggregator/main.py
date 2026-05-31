@@ -5,7 +5,6 @@ import csv
 import json
 import os
 import time
-import inspect
 from flwr.common import ndarrays_to_parameters, parameters_to_ndarrays, Metrics, FitIns, GetPropertiesIns
 from flwr.server.strategy import FedAvg
 import yaml
@@ -42,7 +41,6 @@ class LogAccuracyStrategy(FedAvg):
         self.server_eval_every_rounds = max(1, int(server_eval_every_rounds))
         self.server_eval_max_batches = None if server_eval_max_batches is None else int(server_eval_max_batches)
         self.net = load_model(model_file, self.device)
-        self._test_supports_max_batches = "max_batches" in inspect.signature(test).parameters
 
         self.last_client_participation: dict[str, int] = {}
 
@@ -166,13 +164,7 @@ class LogAccuracyStrategy(FedAvg):
         ndarrays = parameters_to_ndarrays(parameters)
         set_weights(self.net, ndarrays)
         max_batches = None if rnd == self.global_rounds else self.server_eval_max_batches
-        # Backward compatibility: older runtime images may still have test(net, loader, device)
-        if self._test_supports_max_batches:
-            loss, accuracy = test(self.net, self.testloader, self.device, max_batches=max_batches)
-        else:
-            if max_batches is not None:
-                logging.warning("[evaluate] task.test does not support max_batches; running full evaluation")
-            loss, accuracy = test(self.net, self.testloader, self.device)
+        loss, accuracy = test(self.net, self.testloader, self.device, max_batches=max_batches)
         save_model(self.net, self.model_file)
         post_training_metrics(self.metrics_server_url, is_training=False, loss=loss, accuracy=accuracy)
         logging.info(

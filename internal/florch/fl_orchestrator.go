@@ -57,7 +57,14 @@ func NewFlOrchestrator(contOrch contorch.IContainerOrchestrator, eventBus *event
 	configurationModelName string, epochs int32, localRounds int32, globalRounds int32, minFitClients int32, minEvaluateClients int32, minAvailableClients int32,
 	batchSize int32, learningRate float32,
 	modelSize float32, costSource cost.CostSource, costConfiguration *cost.CostConfiguration, rvaEnabled bool, enableServing bool,
-	aomRoundsThreshold int32, aomSelectionEnabled bool, inflightThreshold float32) (*FlOrchestrator, error) {
+	aomRoundsThreshold int32, aomSelectionEnabled bool, inflightThreshold float32,
+	serverEvalEveryRounds int32, serverEvalMaxBatches int32) (*FlOrchestrator, error) {
+	if serverEvalEveryRounds <= 0 {
+		serverEvalEveryRounds = 1
+	}
+	if serverEvalMaxBatches < 0 {
+		serverEvalMaxBatches = 0
+	}
 	orch := &FlOrchestrator{
 		contOrch:                 contOrch,
 		eventBus:                 eventBus,
