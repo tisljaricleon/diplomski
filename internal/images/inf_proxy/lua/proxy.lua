@@ -42,11 +42,13 @@ if parent_service_url ~= "" then
 
 end
 
+--[[
 local last_target = counter:get("last_target") or ""
 if last_target ~= target_url then
     ngx.log(ngx.WARN, "[proxy] SWITCHED ", last_target == "" and "(init)" or last_target, " -> ", target_url, " inflight=", inflight, " is_training=", tostring(is_training))
     counter:set("last_target", target_url)
 end
+--]]
 
 
 counter:incr("inflight", 1, 0)
