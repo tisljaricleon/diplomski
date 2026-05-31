@@ -164,7 +164,12 @@ class LogAccuracyStrategy(FedAvg):
         ndarrays = parameters_to_ndarrays(parameters)
         set_weights(self.net, ndarrays)
         max_batches = None if rnd == self.global_rounds else self.server_eval_max_batches
-        loss, accuracy = test(self.net, self.testloader, self.device, max_batches=max_batches)
+        try:
+            # New task.py supports partial evaluation via max_batches.
+            loss, accuracy = test(self.net, self.testloader, self.device, max_batches=max_batches)
+        except TypeError:
+            # Backward compatibility for older images where test() has no max_batches.
+            loss, accuracy = test(self.net, self.testloader, self.device)
         save_model(self.net, self.model_file)
         post_training_metrics(self.metrics_server_url, is_training=False, loss=loss, accuracy=accuracy)
         logging.info(
