@@ -47,6 +47,15 @@ func BuildInfServiceDeployment(nodeId, pvcClaimName, namespace, image string, us
 		)
 	}
 
+	// Per-node memory sizing: Jetson (useMPS=true) typically has more RAM;
+	// Raspberry Pi nodes should use smaller limits to avoid scheduling issues.
+	reqMem := "2500Mi"
+	limMem := "5Gi"
+	if !useMPS {
+		reqMem = "2000Mi"
+		limMem = "4Gi"
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      common.GetInfSvcDepName(nodeId),
@@ -69,11 +78,11 @@ func BuildInfServiceDeployment(nodeId, pvcClaimName, namespace, image string, us
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("1.0"),
-							corev1.ResourceMemory: resource.MustParse("2500Mi"),
+							corev1.ResourceMemory: resource.MustParse(reqMem),
 						},
 						Limits: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("2.0"),
-							corev1.ResourceMemory: resource.MustParse("5Gi"),
+							corev1.ResourceMemory: resource.MustParse(limMem),
 						},
 					},
 					}},
