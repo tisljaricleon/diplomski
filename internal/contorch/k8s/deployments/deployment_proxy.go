@@ -85,7 +85,7 @@ func BuildInfProxyDeployment(nodeId, namespace, image, localServiceURL, parentSe
 							corev1.ResourceMemory: resource.MustParse("128Mi"),
 						},
 						Limits: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("1000m"),
+							corev1.ResourceCPU:    resource.MustParse("500m"),
 							corev1.ResourceMemory: resource.MustParse("512Mi"),
 							},
 						},
