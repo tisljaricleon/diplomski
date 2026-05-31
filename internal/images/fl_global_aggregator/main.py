@@ -1,11 +1,15 @@
 import torch
 import flwr as fl
 import logging
+import csv
+import json
+import os
+import time
 from flwr.common import ndarrays_to_parameters, parameters_to_ndarrays, Metrics, FitIns, GetPropertiesIns
 from flwr.server.strategy import FedAvg
 import yaml
 from typing import Tuple, Optional
-from task import get_weights, load_data, test, set_weights, load_model, save_model, post_training_metrics
+from task import get_weights, load_data, test, set_weights, load_model, save_model, post_training_metrics, Net
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,6 +40,17 @@ class LogAccuracyStrategy(FedAvg):
 
         self.last_client_participation: dict[str, int] = {}
 
+        # LOG PART START
+        self.rounds_log_file = "/home/model/rounds_log.csv"
+        self._round_start_times: dict[int, float] = {}
+        if not os.path.exists(self.rounds_log_file):
+            with open(self.rounds_log_file, "w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=[
+                    "round", "start_ts_ms", "end_ts_ms", "duration_s",
+                    "num_clients_selected", "selected_client_ids", "loss", "accuracy"
+                ])
+                writer.writeheader()
+        # LOG PART END
 
     def configure_fit(self, server_round, parameters, client_manager):
         config = {}
@@ -48,12 +63,14 @@ class LogAccuracyStrategy(FedAvg):
         client_names = [client.cid for client in all_clients]
         logging.info(f"[configure_fit] Round {server_round}, clients available: {client_names}")
 
+        # LOG PART START
+        self._round_start_times[server_round] = time.time()
+        # LOG PART END
+
         if not self.aom_selection_enabled:
             sampled = client_manager.sample(num_clients=self.min_fit_clients, min_num_clients=self.min_available_clients)
             return [(client, fit_ins) for client in sampled]
-        # Bucket 1: AoM exceeded → always train regardless of load
-        # Bucket 2: low inflight (< threshold) → eligible
-        # Bucket 3: high inflight + recently trained → excluded unless needed
+        
         always_selected = []
         eligible = []
         excluded = []
@@ -98,6 +115,30 @@ class LogAccuracyStrategy(FedAvg):
         post_training_metrics(self.metrics_server_url, is_training=True)
         aggregated = super().aggregate_fit(server_round, results, failures)
         post_training_metrics(self.metrics_server_url, is_training=False)
+
+        # LOG PART START
+        end_time = time.time()
+        start_time = self._round_start_times.get(server_round, end_time)
+        duration = end_time - start_time
+        selected_client_ids = json.dumps([client_proxy.cid for client_proxy, _ in results])
+        with open(self.rounds_log_file, "a", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=[
+                "round", "start_ts_ms", "end_ts_ms", "duration_s",
+                "num_clients_selected", "selected_client_ids", "loss", "accuracy"
+            ])
+            writer.writerow({
+                "round": server_round,
+                "start_ts_ms": int(start_time * 1000),
+                "end_ts_ms": int(end_time * 1000),
+                "duration_s": round(duration, 3),
+                "num_clients_selected": len(results),
+                "selected_client_ids": selected_client_ids,
+                "loss": "",
+                "accuracy": "",
+            })
+        # LOG PART END
+        
+        logging.info(f"[aggregate_fit] Round {server_round}: duration={duration:.1f}s, clients={len(results)}")
         return aggregated
 
 
@@ -116,6 +157,28 @@ class LogAccuracyStrategy(FedAvg):
         save_model(self.net, self.model_file)
         post_training_metrics(self.metrics_server_url, is_training=False, loss=loss, accuracy=accuracy)
         logging.info(f"[evaluate] Round {rnd}: loss: {loss:.4f}, accuracy: {accuracy:.4f}")
+
+        # LOG PART START
+        try:
+            rows = []
+            with open(self.rounds_log_file, "r", newline="") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row["round"] == str(rnd):
+                        row["loss"] = round(loss, 6)
+                        row["accuracy"] = round(accuracy, 6)
+                    rows.append(row)
+            with open(self.rounds_log_file, "w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=[
+                    "round", "start_ts_ms", "end_ts_ms", "duration_s",
+                    "num_clients_selected", "selected_client_ids", "loss", "accuracy"
+                ])
+                writer.writeheader()
+                writer.writerows(rows)
+        except Exception as e:
+            logging.warning(f"[evaluate] Failed to update rounds_log CSV: {e}")
+        # LOG PART END
+
         return loss, {"accuracy": accuracy, "loss": loss}
 
 
@@ -153,6 +216,20 @@ if __name__ == "__main__":
     logging.info(f"Dataset path: {dataset_dir}")
     logging.info(f"Metrics server URL: {metrics_server_url}")
     post_training_metrics(metrics_server_url, is_training=False)
+
+    # ===== EXPERIMENT INIT START (delete this block after experiments) =====
+    # Seeds a fresh ResNet-18 with fixed weights and saves it as the initial
+    # checkpoint so every experiment run starts from exactly the same model,
+    # regardless of whatever was previously saved at model_file.
+    import numpy as np
+    _init_seed = 42
+    torch.manual_seed(_init_seed)
+    np.random.seed(_init_seed)
+    _init_device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    _fresh_model = Net()
+    save_model(_fresh_model, model_file)
+    logging.info(f"[EXPERIMENT INIT] Saved fixed-seed (seed={_init_seed}) initial model to {model_file}")
+    # ===== EXPERIMENT INIT END =====
 
     pretrained_model = load_model(model_file, torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
     ndarrays = get_weights(pretrained_model)

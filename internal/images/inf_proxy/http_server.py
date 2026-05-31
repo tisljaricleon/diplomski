@@ -14,9 +14,6 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-HTTP_SERVER_MARKER = "proxy-metrics-debug-v3"
-print(f"[http_server] marker={HTTP_SERVER_MARKER}", flush=True)
-
 
 try:
     from jtop import jtop
@@ -127,7 +124,6 @@ def get_proxy_metrics():
 
         return JSONResponse({
             "data": {
-                "marker": HTTP_SERVER_MARKER,
                 "inflight_60s_avg": effective,
                 "inflight_requests": current_num,
                 "inflight_60s_max": max_num,

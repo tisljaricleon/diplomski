@@ -83,7 +83,7 @@ class FlowerClient(fl.client.NumPyClient):
         set_weights(self.net, parameters)
         loss, accuracy = test(self.net, self.valloader, self.device)
         logging.info(f"[evaluate, client {self.partition_id}] Test loss: {loss}, test accuracy: {accuracy}")
-        post_training_metrics(self.metrics_server_url, is_training=False, loss=loss, accuracy=accuracy)
+        #post_training_metrics(self.metrics_server_url, is_training=False, loss=loss, accuracy=accuracy)
         return loss, len(self.valloader.dataset), {"accuracy": accuracy,"loss":loss}
     
     
