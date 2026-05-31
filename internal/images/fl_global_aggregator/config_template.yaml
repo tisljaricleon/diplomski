@@ -12,9 +12,9 @@ strategy:
   aom-selection-enabled: %v
   inflight-threshold: %f
   # Run server-side eval every N rounds (1 = every round)
-  server-eval-every-rounds: 1
+  server-eval-every-rounds: %d
   # Use only first N batches for intermediate-round server eval (0/none = full)
-  server-eval-max-batches: 50
+  server-eval-max-batches: %d
 
 urls:
   metric-server-url: "%s"

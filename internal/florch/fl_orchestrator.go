@@ -40,6 +40,8 @@ type FlOrchestrator struct {
 	aomRoundsThreshold      int32
 	aomSelectionEnabled     bool
 	inflightThreshold       float32
+	serverEvalEveryRounds   int32
+	serverEvalMaxBatches    int32
 }
 
 type FlProgress struct {
@@ -74,6 +76,8 @@ func NewFlOrchestrator(contOrch contorch.IContainerOrchestrator, eventBus *event
 		aomRoundsThreshold:      aomRoundsThreshold,
 		aomSelectionEnabled:     aomSelectionEnabled,
 		inflightThreshold:       inflightThreshold,
+		serverEvalEveryRounds:   serverEvalEveryRounds,
+		serverEvalMaxBatches:    serverEvalMaxBatches,
 		reconfigurationEvaluator: &ReconfigurationEvaluator{isActive: false},
 	}
 
@@ -110,6 +114,8 @@ func (orch *FlOrchestrator) Start() error {
 	orch.configuration.GlobalAggregator.AomRoundsThreshold = orch.aomRoundsThreshold
 	orch.configuration.GlobalAggregator.AomSelectionEnabled = orch.aomSelectionEnabled
 	orch.configuration.GlobalAggregator.InflightThreshold = orch.inflightThreshold
+	orch.configuration.GlobalAggregator.ServerEvalEveryRounds = orch.serverEvalEveryRounds
+	orch.configuration.GlobalAggregator.ServerEvalMaxBatches = orch.serverEvalMaxBatches
 	if orch.configuration.GlobalAggregator == nil || orch.configuration.GlobalAggregator.Id == "" {
 		return fmt.Errorf("no global aggregator node found; verify node labels include %s%s=%s", common.FlPrefix, common.FlTypeLabel, common.FL_TYPE_GLOBAL_AGGREGATOR)
 	}

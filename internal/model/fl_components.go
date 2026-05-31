@@ -28,4 +28,6 @@ type FlAggregator struct {
 	AomRoundsThreshold  int32
 	AomSelectionEnabled bool
 	InflightThreshold   float32
+	ServerEvalEveryRounds int32
+	ServerEvalMaxBatches  int32
 }

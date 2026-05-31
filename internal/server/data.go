@@ -39,6 +39,8 @@ type TrainingParams struct {
 	AomRoundsThreshold   int32   `json:"aomRoundsThreshold"`
 	AomSelectionEnabled  bool    `json:"aomSelectionEnabled"`
 	InflightThreshold    float32 `json:"inflightThreshold"`
+	ServerEvalEveryRounds int32  `json:"serverEvalEveryRounds"`
+	ServerEvalMaxBatches  int32  `json:"serverEvalMaxBatches"`
 }
 
 type InferenceParams struct {

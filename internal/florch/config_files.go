@@ -46,6 +46,8 @@ func BuildAggregatorConfigFiles(nodeType string, aggregator *model.FlAggregator)
 			aggregator.AomRoundsThreshold,
 			aggregator.AomSelectionEnabled,
 			aggregator.InflightThreshold,
+			aggregator.ServerEvalEveryRounds,
+			aggregator.ServerEvalMaxBatches,
 			metricsServerURL,
 			common.FL_DATASET_DIR,
 			common.FL_MODEL_FILE,
