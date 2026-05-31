@@ -129,10 +129,12 @@ def train(net, trainloader, valloader, epochs, learning_rate, device):
     return results
 
 
-def test(net, testloader, device):
+def test(net, testloader, device, max_batches=None):
     net.to(device)
     criterion = torch.nn.CrossEntropyLoss()
     correct, loss = 0, 0.0
+    total = 0
+    seen_batches = 0
     with torch.no_grad():
         for batch in testloader:
             images, labels = batch
@@ -141,6 +143,12 @@ def test(net, testloader, device):
             outputs = net(images)
             loss += criterion(outputs, labels).item()
             correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
-    accuracy = correct / len(testloader.dataset)
-    loss = loss / len(testloader)
+            total += labels.size(0)
+            seen_batches += 1
+            if max_batches is not None and seen_batches >= max_batches:
+                break
+    denom = max(total, 1)
+    batch_denom = max(seen_batches, 1)
+    accuracy = correct / denom
+    loss = loss / batch_denom
     return loss, accuracy
