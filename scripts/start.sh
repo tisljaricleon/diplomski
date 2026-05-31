@@ -3,8 +3,8 @@ curl -X POST http://10.19.4.45:8080/fl/start \
   -d '{
     "trainingParams": {
       "epochs": 5,
-      "localRounds": 3,
-      "globalRounds": 100,
+      "localRounds": 10,
+      "globalRounds": 10,
       "minFitClients": 2,
       "minEvaluateClients": 2,
       "minAvailableClients": 2,
