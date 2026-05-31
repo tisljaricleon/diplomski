@@ -20,6 +20,7 @@ logging.basicConfig(
 class LogAccuracyStrategy(FedAvg):
     def __init__(self, model_file, dataset_dir, metrics_server_url,
                  aom_threshold_rounds, aom_selection_enabled, inflight_threshold,
+                 global_rounds, server_eval_every_rounds, server_eval_max_batches,
                  **kwargs):
         super().__init__(**kwargs)
         _, self.testloader = load_data(
@@ -36,6 +37,9 @@ class LogAccuracyStrategy(FedAvg):
         self.aom_threshold_rounds = aom_threshold_rounds
         self.aom_selection_enabled = aom_selection_enabled
         self.inflight_threshold = inflight_threshold
+        self.global_rounds = global_rounds
+        self.server_eval_every_rounds = max(1, int(server_eval_every_rounds))
+        self.server_eval_max_batches = None if server_eval_max_batches is None else int(server_eval_max_batches)
         self.net = load_model(model_file, self.device)
 
         self.last_client_participation: dict[str, int] = {}
@@ -151,12 +155,22 @@ class LogAccuracyStrategy(FedAvg):
         rnd: int,
         parameters,
     ) -> Optional[Tuple[float, Metrics]]:
+        # Speed up round tail latency: run lightweight eval on intermediate rounds,
+        # and full eval only on final round.
+        if rnd != self.global_rounds and (rnd % self.server_eval_every_rounds != 0):
+            logging.info(f"[evaluate] Round {rnd}: skipped (server_eval_every_rounds={self.server_eval_every_rounds})")
+            return None
+
         ndarrays = parameters_to_ndarrays(parameters)
         set_weights(self.net, ndarrays)
-        loss, accuracy = test(self.net, self.testloader, self.device)
+        max_batches = None if rnd == self.global_rounds else self.server_eval_max_batches
+        loss, accuracy = test(self.net, self.testloader, self.device, max_batches=max_batches)
         save_model(self.net, self.model_file)
         post_training_metrics(self.metrics_server_url, is_training=False, loss=loss, accuracy=accuracy)
-        logging.info(f"[evaluate] Round {rnd}: loss: {loss:.4f}, accuracy: {accuracy:.4f}")
+        logging.info(
+            f"[evaluate] Round {rnd}: loss: {loss:.4f}, accuracy: {accuracy:.4f}, "
+            f"max_batches={'full' if max_batches is None else max_batches}"
+        )
 
         # LOG PART START
         try:
@@ -195,6 +209,9 @@ if __name__ == "__main__":
     aom_threshold_rounds = config["strategy"]["aom-rounds-treshold"]
     aom_selection_enabled = config["strategy"]["aom-selection-enabled"]
     inflight_threshold = float(config["strategy"]["inflight-threshold"])
+    server_eval_every_rounds = int(config["strategy"].get("server-eval-every-rounds", 1))
+    _max_batches_raw = config["strategy"].get("server-eval-max-batches", 50)
+    server_eval_max_batches = None if _max_batches_raw in (None, "none", "None", 0) else int(_max_batches_raw)
     server_address = config["server"]["address"]
     global_rounds = config["server"]["global-rounds"]
     model_file = config["paths"]["model-file"]
@@ -210,6 +227,8 @@ if __name__ == "__main__":
     logging.info(f"AoM threshold rounds: {aom_threshold_rounds}")
     logging.info(f"AoM selection enabled: {aom_selection_enabled}")
     logging.info(f"Inflight threshold: {inflight_threshold}")
+    logging.info(f"Server eval every rounds: {server_eval_every_rounds}")
+    logging.info(f"Server eval max batches: {server_eval_max_batches}")
     logging.info(f"Server address: {server_address}")
     logging.info(f"Global rounds: {global_rounds}")
     logging.info(f"Model path: {model_file}")
@@ -242,6 +261,9 @@ if __name__ == "__main__":
         aom_threshold_rounds=aom_threshold_rounds,
         aom_selection_enabled=aom_selection_enabled,
         inflight_threshold=inflight_threshold,
+        global_rounds=global_rounds,
+        server_eval_every_rounds=server_eval_every_rounds,
+        server_eval_max_batches=server_eval_max_batches,
         fraction_fit=fraction_fit,
         fraction_evaluate=fraction_evaluate,
         min_fit_clients=min_fit_clients,

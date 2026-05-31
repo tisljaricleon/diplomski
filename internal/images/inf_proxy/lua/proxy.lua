@@ -6,6 +6,7 @@ local counter = ngx.shared.inflight_60s_avg
 local local_service_url  = os.getenv("LOCAL_SERVICE_URL")  or ""
 local parent_service_url = os.getenv("PARENT_SERVICE_URL") or ""
 local max_inflight       = tonumber(os.getenv("MAX_INFLIGHT")) or 150
+local training_refresh_s = (tonumber(os.getenv("TRAINING_METRICS_REFRESH_MS")) or 1000) / 1000
 local inflight           = counter:get("inflight") or 0
 local is_training        = false
 
@@ -22,17 +23,42 @@ end
 
 
 if parent_service_url ~= "" then
-    local http_client = http.new()
-    http_client:set_timeout(500)
+    -- Cache training state to avoid calling sidecar per request.
+    -- One worker refreshes every TRAINING_METRICS_REFRESH_MS (default 500ms).
+    local now = ngx.now()
+    local last_fetch = counter:get("training_last_fetch") or 0
 
-    local training_response, training_error = http_client:request_uri("http://127.0.0.1:8001/trainingMetrics", { method = "GET" })
-    if not (training_response and training_response.status == 200) then
-        ngx.log(ngx.WARN, "[http server] Failed to fetch /trainingMetrics: ", training_error)
-    else
-        local training_payload = cjson.decode(training_response.body)
-        if training_payload and training_payload.data and training_payload.data.is_training == true then
-            is_training = true
+    local cached_training = counter:get("training_is_training")
+    if cached_training ~= nil then
+        is_training = (cached_training == 1)
+    end
+
+    if (now - last_fetch) >= training_refresh_s then
+        local got_lock = counter:add("training_fetch_lock", 1, 0.2)
+        if got_lock then
+            local http_client = http.new()
+            http_client:set_timeout(120)
+
+            local training_response, training_error = http_client:request_uri("http://127.0.0.1:8001/trainingMetrics", { method = "GET" })
+            if not (training_response and training_response.status == 200) then
+                ngx.log(ngx.WARN, "[http server] Failed to fetch /trainingMetrics: ", training_error)
+            else
+                local training_payload = cjson.decode(training_response.body)
+                local fetched_training = false
+                if training_payload and training_payload.data and training_payload.data.is_training == true then
+                    fetched_training = true
+                end
+                counter:set("training_is_training", fetched_training and 1 or 0)
+            end
+
+            counter:set("training_last_fetch", now)
+            counter:delete("training_fetch_lock")
         end
+    end
+
+    local cached_training_after = counter:get("training_is_training")
+    if cached_training_after ~= nil then
+        is_training = (cached_training_after == 1)
     end
 
     if is_training and inflight > max_inflight then
@@ -42,13 +68,11 @@ if parent_service_url ~= "" then
 
 end
 
---[[
 local last_target = counter:get("last_target") or ""
 if last_target ~= target_url then
     ngx.log(ngx.WARN, "[proxy] SWITCHED ", last_target == "" and "(init)" or last_target, " -> ", target_url, " inflight=", inflight, " is_training=", tostring(is_training))
     counter:set("last_target", target_url)
 end
---]]
 
 
 counter:incr("inflight", 1, 0)
