@@ -29,18 +29,31 @@ func BuildInfProxyDeployment(nodeId, namespace, image, localServiceURL, parentSe
 			SubPath:   "http_server.py",
 			ReadOnly:  true,
 		},
+		{
+			Name:      "jtop-socket",
+			MountPath: "/run/jtop.sock",
+		},
 	}
-	volumes := []corev1.Volume{{
-		Name: "proxyconfig",
-		VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
-			LocalObjectReference: corev1.LocalObjectReference{Name: common.GetInfProxyConfigMapName(nodeId)},
-			Items: []corev1.KeyToPath{
-				{Key: "nginx.conf", Path: "nginx.conf"},
-				{Key: "proxy.lua", Path: "lua/proxy.lua"},
-				{Key: "http_server.py", Path: "http_server.py"},
-			},
-		}},
-	}}
+	jtopSocketPath := "/run/jtop.sock"
+	volumes := []corev1.Volume{
+		{
+			Name: "proxyconfig",
+			VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{Name: common.GetInfProxyConfigMapName(nodeId)},
+				Items: []corev1.KeyToPath{
+					{Key: "nginx.conf", Path: "nginx.conf"},
+					{Key: "proxy.lua", Path: "lua/proxy.lua"},
+					{Key: "http_server.py", Path: "http_server.py"},
+				},
+			}},
+		},
+		{
+			Name: "jtop-socket",
+			VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{
+				Path: jtopSocketPath,
+			}},
+		},
+	}
 	env := []corev1.EnvVar{
 		{Name: "LOCAL_SERVICE_URL", Value: localServiceURL},
 		{Name: "PARENT_SERVICE_URL", Value: parentServiceURL},
