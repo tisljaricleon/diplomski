@@ -44,7 +44,7 @@ func BuildInfProxyDeployment(nodeId, namespace, image, localServiceURL, parentSe
 	env := []corev1.EnvVar{
 		{Name: "LOCAL_SERVICE_URL", Value: localServiceURL},
 		{Name: "PARENT_SERVICE_URL", Value: parentServiceURL},
-		{Name: "MAX_INFLIGHT", Value: "25"},
+		{Name: "MAX_INFLIGHT", Value: "999999"},
 	}
 
 	return &appsv1.Deployment{
