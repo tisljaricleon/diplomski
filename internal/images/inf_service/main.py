@@ -21,6 +21,7 @@ logging.basicConfig(
 
 
 FL_MODEL_FILE = os.getenv("FL_MODEL_FILE", "/home/model/model.pt")
+MAX_CONCURRENT_INFERENCES = int(os.getenv("MAX_CONCURRENT_INFERENCES", "4"))
 LABEL_NAMES = [
     "airplane", "automobile", "bird", "cat", "deer",
     "dog", "frog", "horse", "ship", "truck"
@@ -60,16 +61,28 @@ def load_model():
         return None
 
 model = load_model()
+_inference_semaphore: asyncio.Semaphore | None = None
 
 
 def inference(tensor):
     with torch.no_grad():
         output = model(tensor)
-        preds = output.argmax(dim=1)
-        return preds.cpu().numpy(), output.cpu().numpy()
+        preds = output.argmax(dim=1).cpu().numpy()
+        logits = output.cpu().numpy()
+        del output
+        torch.cuda.empty_cache()
+        return preds, logits
 
 
 app = FastAPI()
+
+
+@app.on_event("startup")
+async def startup_event():
+    global _inference_semaphore
+    _inference_semaphore = asyncio.Semaphore(MAX_CONCURRENT_INFERENCES)
+    logging.info(f"[startup] MAX_CONCURRENT_INFERENCES={MAX_CONCURRENT_INFERENCES}")
+    
 @app.post("/predict")
 async def predict(files: List[UploadFile] = File(...)):
     global model
@@ -85,11 +98,19 @@ async def predict(files: List[UploadFile] = File(...)):
             image = Image.open(io.BytesIO(await file.read())).convert("RGB")
             tensor = cifar10_transform(image)
             images.append(tensor)
-        batch_tensor = torch.stack(images).to(device)
 
-        start_time = time.time()
-        preds, logits = await asyncio.to_thread(inference, batch_tensor)
-        end_time = time.time()
+        wait_start = time.time()
+        async with _inference_semaphore:
+            queue_wait = time.time() - wait_start
+            if queue_wait > 0.01:
+                logging.warning(f"[predict] semaphore wait: {queue_wait*1000:.1f}ms (slots={MAX_CONCURRENT_INFERENCES})")
+            batch_tensor = torch.stack(images).to(device)
+            del images
+
+            start_time = time.time()
+            preds, logits = await asyncio.to_thread(inference, batch_tensor)
+            end_time = time.time()
+            del batch_tensor
         logging.info(f"[predict] duration: {(end_time - start_time) * 1000:.2f}ms")
 
         probs = torch.nn.functional.softmax(torch.from_numpy(logits), dim=1).numpy()

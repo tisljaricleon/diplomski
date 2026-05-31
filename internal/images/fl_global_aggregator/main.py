@@ -1,4 +1,5 @@
 import torch
+import gc
 import flwr as fl
 import logging
 import csv
@@ -69,6 +70,10 @@ class LogAccuracyStrategy(FedAvg):
 
         # LOG PART START
         self._round_start_times[server_round] = time.time()
+        # Remove old entries to prevent unbounded growth
+        old_rounds = [r for r in self._round_start_times if r < server_round - 5]
+        for r in old_rounds:
+            del self._round_start_times[r]
         # LOG PART END
 
         if not self.aom_selection_enabled:
@@ -163,6 +168,8 @@ class LogAccuracyStrategy(FedAvg):
 
         ndarrays = parameters_to_ndarrays(parameters)
         set_weights(self.net, ndarrays)
+        del ndarrays
+        gc.collect()
         max_batches = None if rnd == self.global_rounds else self.server_eval_max_batches
         loss, accuracy = test(self.net, self.testloader, self.device, max_batches=max_batches)
         save_model(self.net, self.model_file)
