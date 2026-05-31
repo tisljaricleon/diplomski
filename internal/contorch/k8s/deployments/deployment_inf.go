@@ -52,7 +52,7 @@ func BuildInfServiceDeployment(nodeId, pvcClaimName, namespace, image string, us
 	reqMem := "2500Mi"
 	limMem := "5Gi"
 	if !useMPS {
-		reqMem = "2000Mi"
+		reqMem = "2Gi"
 		limMem = "4Gi"
 	}
 
