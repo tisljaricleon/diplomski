@@ -76,7 +76,7 @@ def post_training_metrics(metrics_server_url, is_training=None, loss=None, accur
         logging.warning(f"[post_training_metrics] Failed to post metrics: {e}")
     
 
-def load_data(dataset_dir: str, partition_id: int, num_partitions: int, batch_size: int, num_workers: int = 4, pin_memory: bool = True):
+def load_data(dataset_dir: str, partition_id: int, num_partitions: int, batch_size: int, num_workers: int = 0, pin_memory: bool = False):
     transform = Compose([
         ToTensor(),
         Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))

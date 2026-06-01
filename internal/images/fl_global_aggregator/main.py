@@ -28,8 +28,6 @@ class LogAccuracyStrategy(FedAvg):
             partition_id=0,
             num_partitions=1,
             batch_size=32,
-            num_workers=0,
-            pin_memory=False,
         )
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         logging.info(f"[__init__] Using device: {self.device}")
