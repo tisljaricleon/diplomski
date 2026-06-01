@@ -7,7 +7,7 @@ import (
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func BuildInfProxyService(nodeId string, nodePort int32) *corev1.Service {
+func BuildInfProxyService(nodeId string, nodePort, metricsNodePort int32) *corev1.Service {
 	proxyPort := corev1.ServicePort{
 		Name:       "http-proxy",
 		Port:       common.INF_PROXY_PORT,
@@ -20,6 +20,7 @@ func BuildInfProxyService(nodeId string, nodePort int32) *corev1.Service {
 		Port:       common.INF_PROXY_SIDECAR_PORT,
 		TargetPort: intstr.FromInt(common.INF_PROXY_SIDECAR_PORT),
 	}
+	metricsPort.NodePort = metricsNodePort
 
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: common.GetInfProxySvcName(nodeId)},

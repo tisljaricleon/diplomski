@@ -14,6 +14,7 @@ const DataDistributionPrefix = "data/"
 
 const InfProxyPrefix = "inf-proxy/"
 const ProxyNodePortLabel = "node-port"
+const ProxyMetricsNodePortLabel = "metrics-node-port"
 
 
 // Node image type labels

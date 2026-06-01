@@ -36,4 +36,5 @@ type FlLabels struct {
 
 type InfProxyLabels struct {
 	NodePort int32
+	MetricsNodePort int32
 }

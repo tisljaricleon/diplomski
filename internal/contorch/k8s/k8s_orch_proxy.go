@@ -8,23 +8,23 @@ import (
 	k8sservices "github.com/AIoTwin-Adaptive-FL-Orch/fl-orchestrator/internal/contorch/k8s/services"
 )
 
-func (orch *K8sOrchestrator) getInfProxyRuntime(nodeId string) (string, int32, error) {
+func (orch *K8sOrchestrator) getInfProxyRuntime(nodeId string) (string, int32, int32, error) {
 	node, exists := orch.availableNodes[nodeId]
 	if !exists {
-		return "", 0, fmt.Errorf("node %s not found in available nodes", nodeId)
+		return "", 0, 0, fmt.Errorf("node %s not found in available nodes", nodeId)
 	}
 
 	imageType := node.Labels.Common.ImageType
 	if imageType == "" {
-		return "", 0, fmt.Errorf("node %s has no image type label", nodeId)
+		return "", 0, 0, fmt.Errorf("node %s has no image type label", nodeId)
 	}
 
 	image, err := getInfProxyImage(imageType)
 	if err != nil {
-		return "", 0, err
+		return "", 0, 0, err
 	}
 
-	return image, node.Labels.InfProxy.NodePort, nil
+	return image, node.Labels.InfProxy.NodePort, node.Labels.InfProxy.MetricsNodePort, nil
 }
 
 func (orch *K8sOrchestrator) CreateInfProxy(nodeId string, configFiles map[string]string, parentServiceURL string) error {
@@ -32,7 +32,7 @@ func (orch *K8sOrchestrator) CreateInfProxy(nodeId string, configFiles map[strin
 		return err
 	}
 
-	image, nodePort, err := orch.getInfProxyRuntime(nodeId)
+	image, nodePort, metricsNodePort, err := orch.getInfProxyRuntime(nodeId)
 	if err != nil {
 		return err
 	}
@@ -50,7 +50,7 @@ func (orch *K8sOrchestrator) CreateInfProxy(nodeId string, configFiles map[strin
 		return err
 	}
 
-	service := k8sservices.BuildInfProxyService(nodeId, nodePort)
+	service := k8sservices.BuildInfProxyService(nodeId, nodePort, metricsNodePort)
 	if err := orch.createService(service); err != nil {
 		return err
 	}

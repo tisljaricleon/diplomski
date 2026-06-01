@@ -139,6 +139,7 @@ func nodeLabelsToNodeModel(labels map[string]string, nodeModel *model.Node) {
 		imageType := getLabelValue(labels, common.CommonPrefix+common.ImageTypeLabel, common.ImageTypeLabel)
 		useMPS := getLabelValue(labels, common.CommonPrefix+common.UseMPSLabel, common.UseMPSLabel) == "true"
 		proxyNodePort, _ := strconv.Atoi(getLabelValue(labels, common.InfProxyPrefix+common.ProxyNodePortLabel, common.ProxyNodePortLabel))
+		proxyMetricsNodePort, _ := strconv.Atoi(getLabelValue(labels, common.InfProxyPrefix+common.ProxyMetricsNodePortLabel, common.ProxyMetricsNodePortLabel))
 
 		communicationCosts := make(map[string]float32)
 		dataDistribution := make(map[string]int64)
@@ -167,6 +168,7 @@ func nodeLabelsToNodeModel(labels map[string]string, nodeModel *model.Node) {
 		nodeModel.Labels.Common.ImageType = imageType
 		nodeModel.Labels.Common.UseMPS = useMPS
 		nodeModel.Labels.InfProxy.NodePort = int32(proxyNodePort)
+		nodeModel.Labels.InfProxy.MetricsNodePort = int32(proxyMetricsNodePort)
 }
 
 // Event notifiers
