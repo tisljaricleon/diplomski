@@ -14,7 +14,7 @@ strategy:
   # Run server-side eval every N rounds (1 = every round)
   server-eval-every-rounds: 1
   # Use only first N batches for intermediate-round server eval (0/none = full)
-  server-eval-max-batches: 50
+  server-eval-max-batches: 10
 
 urls:
   metric-server-url: "http://localhost:8001"
