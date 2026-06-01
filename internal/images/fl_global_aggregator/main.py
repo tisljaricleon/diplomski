@@ -213,7 +213,6 @@ if __name__ == "__main__":
     logging.info(f"Server address: {server_address}")
     logging.info(f"Global rounds: {global_rounds}")
     logging.info(f"Model path: {model_file}")
-    logging.info(f"Dataset path: {dataset_dir}")
     logging.info(f"Metrics server URL: {metrics_server_url}")
     post_training_metrics(metrics_server_url, is_training=False)
 
