@@ -2,10 +2,31 @@ local http    = require "resty.http"
 local cjson   = require "cjson.safe"
 local counter = ngx.shared.inflight_60s_avg
 
+local function is_retryable_upstream_error(err)
+    if not err then
+        return false
+    end
+
+    local e = string.lower(err)
+    return string.find(e, "connection reset by peer", 1, true) ~= nil
+        or string.find(e, "closed", 1, true) ~= nil
+        or string.find(e, "timeout", 1, true) ~= nil
+end
+
+local function request_upstream(url, method, headers, body)
+    local c = http.new()
+    c:set_timeout(60000)
+    return c:request_uri(url, {
+        method = method,
+        headers = headers,
+        body = body,
+    })
+end
+
 
 local local_service_url  = os.getenv("LOCAL_SERVICE_URL")  or ""
 local parent_service_url = os.getenv("PARENT_SERVICE_URL") or ""
-local max_inflight       = tonumber(os.getenv("MAX_INFLIGHT")) or 150
+local max_inflight       = tonumber(os.getenv("MAX_INFLIGHT")) or 99999
 local training_refresh_s = (tonumber(os.getenv("TRAINING_METRICS_REFRESH_MS")) or 1000) / 1000
 local inflight           = counter:get("inflight") or 0
 local is_training        = false
@@ -77,19 +98,18 @@ end
 
 counter:incr("inflight", 1, 0)
 
-local upstream_client = http.new()
-upstream_client:set_timeout(60000)
 local body = ngx.req.get_body_data()
 local headers = ngx.req.get_headers()
 
-local upstream_request, upstream_error = upstream_client:request_uri(
-    target_url .. "/predict",
-    {
-        method  = ngx.req.get_method(),
-        headers = headers,
-        body    = body,
-    }
-)
+local request_url = target_url .. "/predict"
+local method = ngx.req.get_method()
+
+local upstream_request, upstream_error = request_upstream(request_url, method, headers, body)
+if (not upstream_request) and is_retryable_upstream_error(upstream_error) then
+    ngx.log(ngx.WARN, "[proxy] transient upstream error, retrying once: ", upstream_error)
+    ngx.sleep(0.05)
+    upstream_request, upstream_error = request_upstream(request_url, method, headers, body)
+end
 
 counter:incr("inflight", -1, 0)
 
