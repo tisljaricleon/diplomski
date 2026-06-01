@@ -118,16 +118,13 @@ def get_proxy_metrics():
         avg_num = float(avg_value) if avg_value is not None else 0.0
         current_num = float(current_value) if current_value is not None else 0.0
         max_num = float(max_value) if max_value is not None else 0.0
-        effective = max(avg_num, current_num, max_num)
-
-        logging.info(f"[proxyMetrics] raw_avg={avg_num} current={current_num} max={max_num} -> effective={effective}")
+        logging.info(f"[proxyMetrics] avg60s={avg_num} current={current_num} max={max_num}")
 
         return JSONResponse({
             "data": {
-                "inflight_60s_avg": effective,
+                "inflight_60s_avg": avg_num,
                 "inflight_requests": current_num,
                 "inflight_60s_max": max_num,
-                "inflight_60s_avg_raw": avg_num,
             }
         })
     except Exception as e:
