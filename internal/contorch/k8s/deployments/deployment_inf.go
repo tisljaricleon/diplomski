@@ -47,8 +47,7 @@ func BuildInfServiceDeployment(nodeId, pvcClaimName, namespace, image string, us
 		)
 	}
 
-	// Per-node memory sizing: Jetson (useMPS=true) typically has more RAM;
-	// Raspberry Pi nodes should use smaller limits to avoid scheduling issues.
+
 	reqMem := "2500Mi"
 	limMem := "5Gi"
 	if !useMPS {
