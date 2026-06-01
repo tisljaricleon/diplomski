@@ -9,7 +9,7 @@ from flwr.common import ndarrays_to_parameters, parameters_to_ndarrays, Metrics,
 from flwr.server.strategy import FedAvg
 import yaml
 from typing import Tuple, Optional
-from task import get_weights, load_data, test, set_weights, load_model, save_model, post_training_metrics, Net
+from task import get_weights, set_weights, load_model, save_model, post_training_metrics, Net
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,17 +18,10 @@ logging.basicConfig(
 )
 
 class LogAccuracyStrategy(FedAvg):
-    def __init__(self, model_file, dataset_dir, metrics_server_url,
+    def __init__(self, model_file, metrics_server_url,
                  aom_threshold_rounds, aom_selection_enabled, inflight_threshold,
-                 global_rounds, server_eval_every_rounds, server_eval_max_batches,
-                 **kwargs):
+                 global_rounds, **kwargs):
         super().__init__(**kwargs)
-        _, self.testloader = load_data(
-            dataset_dir=dataset_dir,
-            partition_id=0,
-            num_partitions=1,
-            batch_size=32,
-        )
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         logging.info(f"[__init__] Using device: {self.device}")
 
@@ -38,8 +31,6 @@ class LogAccuracyStrategy(FedAvg):
         self.aom_selection_enabled = aom_selection_enabled
         self.inflight_threshold = inflight_threshold
         self.global_rounds = global_rounds
-        self.server_eval_every_rounds = max(1, int(server_eval_every_rounds))
-        self.server_eval_max_batches = None if server_eval_max_batches is None else int(server_eval_max_batches)
         self.net = load_model(model_file, self.device)
 
         self.last_client_participation: dict[str, int] = {}
@@ -146,43 +137,24 @@ class LogAccuracyStrategy(FedAvg):
 
 
     def aggregate_evaluate(self, server_round, results, failures):
-        return super().aggregate_evaluate(server_round, results, failures)
+        aggregated = super().aggregate_evaluate(server_round, results, failures)
+        if not results:
+            return aggregated
 
+        # Average loss and accuracy across clients, weighted by dataset size
+        total_samples = sum(num_samples for _, evaluate_res in results for num_samples in [evaluate_res.num_examples])
+        avg_loss = sum(evaluate_res.loss * evaluate_res.num_examples for _, evaluate_res in results) / total_samples
+        avg_accuracy = sum(evaluate_res.metrics.get("accuracy", 0.0) * evaluate_res.num_examples for _, evaluate_res in results) / total_samples
+        logging.info(f"[aggregate_evaluate] Round {server_round}: client avg loss={avg_loss:.4f}, accuracy={avg_accuracy:.4f}")
 
-    def evaluate(
-        self,
-        rnd: int,
-        parameters,
-    ) -> Optional[Tuple[float, Metrics]]:
-        # Speed up round tail latency: run lightweight eval on intermediate rounds,
-        # and full eval only on final round.
-        if rnd != self.global_rounds and (rnd % self.server_eval_every_rounds != 0):
-            logging.info(f"[evaluate] Round {rnd}: skipped (server_eval_every_rounds={self.server_eval_every_rounds})")
-            return None
-
-        ndarrays = parameters_to_ndarrays(parameters)
-        set_weights(self.net, ndarrays)
-        max_batches = None if rnd == self.global_rounds else self.server_eval_max_batches
-        logging.info(f"[evaluate] Round {rnd}: started, max_batches={'full' if max_batches is None else max_batches}")
-        eval_start = time.time()
-        loss, accuracy = test(self.net, self.testloader, self.device, max_batches=max_batches)
-        eval_duration = time.time() - eval_start
-        save_model(self.net, self.model_file)
-        post_training_metrics(self.metrics_server_url, is_training=False, loss=loss, accuracy=accuracy)
-        logging.info(
-            f"[evaluate] Round {rnd}: loss: {loss:.4f}, accuracy: {accuracy:.4f}, "
-            f"duration: {eval_duration:.2f}s, max_batches={'full' if max_batches is None else max_batches}"
-        )
-
-        # LOG PART START
         try:
             rows = []
             with open(self.rounds_log_file, "r", newline="") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if row["round"] == str(rnd):
-                        row["loss"] = round(loss, 6)
-                        row["accuracy"] = round(accuracy, 6)
+                    if row["round"] == str(server_round) and row["loss"] == "":
+                        row["loss"] = round(avg_loss, 6)
+                        row["accuracy"] = round(avg_accuracy, 6)
                     rows.append(row)
             with open(self.rounds_log_file, "w", newline="") as f:
                 writer = csv.DictWriter(f, fieldnames=[
@@ -192,10 +164,23 @@ class LogAccuracyStrategy(FedAvg):
                 writer.writeheader()
                 writer.writerows(rows)
         except Exception as e:
-            logging.warning(f"[evaluate] Failed to update rounds_log CSV: {e}")
-        # LOG PART END
+            logging.warning(f"[aggregate_evaluate] Failed to update rounds_log CSV: {e}")
 
-        return loss, {"accuracy": accuracy, "loss": loss}
+        return aggregated
+
+
+    def evaluate(
+        self,
+        rnd: int,
+        parameters,
+    ) -> Optional[Tuple[float, Metrics]]:
+        if rnd == self.global_rounds:
+            ndarrays = parameters_to_ndarrays(parameters)
+            set_weights(self.net, ndarrays)
+            del ndarrays
+            save_model(self.net, self.model_file)
+            logging.info(f"[evaluate] Round {rnd}: final model saved")
+        return None
 
 
 if __name__ == "__main__":
@@ -211,13 +196,9 @@ if __name__ == "__main__":
     aom_threshold_rounds = int(config["strategy"].get("aom-rounds-treshold", 3))
     aom_selection_enabled = bool(config["strategy"].get("aom-selection-enabled", True))
     inflight_threshold = float(config["strategy"].get("inflight-threshold", 9999999.0))
-    server_eval_every_rounds = int(config["strategy"].get("server-eval-every-rounds", 1))
-    _max_batches_raw = config["strategy"].get("server-eval-max-batches", 50)
-    server_eval_max_batches = None if _max_batches_raw in (None, "none", "None", 0) else int(_max_batches_raw)
     server_address = config["server"]["address"]
     global_rounds = config["server"]["global-rounds"]
     model_file = config["paths"]["model-file"]
-    dataset_dir = config["paths"]["dataset-dir"]
     metrics_server_url = config["urls"]["metric-server-url"]
 
     logging.info("Parameters:")
@@ -229,8 +210,6 @@ if __name__ == "__main__":
     logging.info(f"AoM threshold rounds: {aom_threshold_rounds}")
     logging.info(f"AoM selection enabled: {aom_selection_enabled}")
     logging.info(f"Inflight threshold: {inflight_threshold}")
-    logging.info(f"Server eval every rounds: {server_eval_every_rounds}")
-    logging.info(f"Server eval max batches: {server_eval_max_batches}")
     logging.info(f"Server address: {server_address}")
     logging.info(f"Global rounds: {global_rounds}")
     logging.info(f"Model path: {model_file}")
@@ -258,14 +237,11 @@ if __name__ == "__main__":
 
     strategy = LogAccuracyStrategy(
         model_file=model_file,
-        dataset_dir=dataset_dir,
         metrics_server_url=metrics_server_url,
         aom_threshold_rounds=aom_threshold_rounds,
         aom_selection_enabled=aom_selection_enabled,
         inflight_threshold=inflight_threshold,
         global_rounds=global_rounds,
-        server_eval_every_rounds=server_eval_every_rounds,
-        server_eval_max_batches=server_eval_max_batches,
         fraction_fit=fraction_fit,
         fraction_evaluate=fraction_evaluate,
         min_fit_clients=min_fit_clients,
