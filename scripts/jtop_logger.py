@@ -25,14 +25,13 @@ def _handle_signal(signum, frame):
 
 
 def _build_row(stats: dict) -> dict:
-    now = dt.datetime.now(dt.timezone.utc)
     return {
         "client_name": SOURCE,
         "timestamp": int(time.time() * 1000),
         "gpu_usage": stats.get("GPU"),
-        "gpu_temperature": stats.get("Temp GPU"),
+        "gpu_temperature": stats.get("Temp gpu"),
         "ram_usage": stats.get("RAM"),
-        "swap_usage": stats.get("Swap"),
+        "swap_usage": stats.get("SWAP"),
     }
 
 
@@ -48,21 +47,18 @@ FIELDNAMES = [
 
 def run(output_path: str, interval_s: float) -> None:
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-    need_header = not os.path.exists(output_path) or os.path.getsize(output_path) == 0
 
-    with open(output_path, "a", newline="", encoding="utf-8") as f:
+    with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-        if need_header:
-            writer.writeheader()
-            f.flush()
+        writer.writeheader()
+        f.flush()
 
         print(f"{SOURCE}: writing to {output_path}, interval={interval_s}s (Ctrl+C to stop)")
 
         with jtop() as jetson:
             while not STOP and jetson.ok():
-                import pprint
-                pprint.pprint(jetson.stats)
-                print("---")
+                writer.writerow(_build_row(jetson.stats))
+                f.flush()
                 time.sleep(interval_s)
 
     print(f"{SOURCE}: stopped.")
