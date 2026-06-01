@@ -14,7 +14,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 
-local_round = 1
+local_round = 0
 
 
 class FlowerClient(fl.client.NumPyClient):
@@ -47,6 +47,7 @@ class FlowerClient(fl.client.NumPyClient):
 
     def fit(self, parameters, config):
         global local_round
+        local_round += 1
         post_training_metrics(self.metrics_server_url, is_training=True)
         logging.info(f"[fit, client {self.partition_id}] Global round {local_round} started")
         set_weights(self.net, parameters)
@@ -70,7 +71,6 @@ class FlowerClient(fl.client.NumPyClient):
                 loss=results.get("val_loss"),
                 accuracy=results.get("val_accuracy"),
             )
-            local_round += 1
             logging.info(f"[fit, client {self.partition_id}] Global round {local_round} ended in {round_duration:.2f}s")
 
             return get_weights(self.net), len(self.trainloader.dataset), results

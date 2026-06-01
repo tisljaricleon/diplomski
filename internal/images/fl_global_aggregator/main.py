@@ -163,12 +163,15 @@ class LogAccuracyStrategy(FedAvg):
         ndarrays = parameters_to_ndarrays(parameters)
         set_weights(self.net, ndarrays)
         max_batches = None if rnd == self.global_rounds else self.server_eval_max_batches
+        logging.info(f"[evaluate] Round {rnd}: started, max_batches={'full' if max_batches is None else max_batches}")
+        eval_start = time.time()
         loss, accuracy = test(self.net, self.testloader, self.device, max_batches=max_batches)
+        eval_duration = time.time() - eval_start
         save_model(self.net, self.model_file)
         post_training_metrics(self.metrics_server_url, is_training=False, loss=loss, accuracy=accuracy)
         logging.info(
             f"[evaluate] Round {rnd}: loss: {loss:.4f}, accuracy: {accuracy:.4f}, "
-            f"max_batches={'full' if max_batches is None else max_batches}"
+            f"duration: {eval_duration:.2f}s, max_batches={'full' if max_batches is None else max_batches}"
         )
 
         # LOG PART START
