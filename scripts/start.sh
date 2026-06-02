@@ -8,8 +8,8 @@ curl -X POST http://10.19.4.45:8080/fl/start \
       "minFitClients": 2,
       "minEvaluateClients": 2,
       "minAvailableClients": 2,
-      "batchSize": 32,
-      "learningRate": 0.001,
+      "batchSize": 64,
+      "learningRate": 0.0003,
       "aomRoundsThreshold": 3,
       "aomSelectionEnabled": true,
       "inflightThreshold": 150.0

@@ -79,7 +79,7 @@ def post_training_metrics(metrics_server_url, is_training=None, loss=None, accur
 def load_data(dataset_dir: str, partition_id: int, num_partitions: int, batch_size: int, num_workers: int = 0, pin_memory: bool = False):
     transform = Compose([
         ToTensor(),
-        Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
     ])
 
     os.makedirs(dataset_dir, exist_ok=True)
@@ -107,7 +107,7 @@ def load_data(dataset_dir: str, partition_id: int, num_partitions: int, batch_si
 def train(net, trainloader, valloader, epochs, learning_rate, device):
     net.to(device)
     criterion = torch.nn.CrossEntropyLoss().to(device)
-    optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9)
+    optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9, weight_decay=1e-4)
     net.train()
     for epoch in range(epochs):
         epoch_start = time.time()

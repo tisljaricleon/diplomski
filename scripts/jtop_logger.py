@@ -48,6 +48,10 @@ FIELDNAMES = [
 def run(output_path: str, interval_s: float) -> None:
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
+    # Always start a fresh log file for each run.
+    if os.path.exists(output_path):
+        os.remove(output_path)
+
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
         writer.writeheader()
