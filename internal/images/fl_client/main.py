@@ -2,10 +2,9 @@ import yaml
 import json
 import urllib.request
 import csv
-import os
 import torch
 import flwr as fl
-from task import Net, get_weights, load_data, set_weights, test, train, load_model, save_model, post_training_metrics
+from task import Net, get_weights, load_data, set_weights, test, train, save_model, post_training_metrics
 import logging
 import time
 
@@ -32,7 +31,12 @@ class FlowerClient(fl.client.NumPyClient):
         self.partition_id = partition_id
         self.model_file = model_file
         self.metrics_server_url = metrics_server_url
-        self.net = load_model(self.model_file, self.device)
+        init_seed = 42
+        torch.manual_seed(init_seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(init_seed)
+        self.net = Net().to(self.device)
+        logging.info(f"[__init__, client {partition_id}] Initialized fresh model with seed={init_seed}")
         self.rounds_log_file = f"/home/model/client_rounds_log_p{self.partition_id}.csv"
 
         with open(self.rounds_log_file, "w", newline="") as f:
