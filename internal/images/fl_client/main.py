@@ -1,6 +1,8 @@
 import yaml
 import json
 import urllib.request
+import csv
+import os
 import torch
 import flwr as fl
 from task import Net, get_weights, load_data, set_weights, test, train, load_model, save_model, post_training_metrics
@@ -15,6 +17,7 @@ logging.basicConfig(
 )
 
 local_round = 0
+local_eval_round = 0
 
 
 class FlowerClient(fl.client.NumPyClient):
@@ -30,6 +33,32 @@ class FlowerClient(fl.client.NumPyClient):
         self.model_file = model_file
         self.metrics_server_url = metrics_server_url
         self.net = load_model(self.model_file, self.device)
+        self.rounds_log_file = f"/home/model/client_rounds_log_p{self.partition_id}.csv"
+
+        with open(self.rounds_log_file, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=[
+                "round", "phase", "start_ts_ms", "end_ts_ms", "duration_s",
+                "train_samples", "eval_samples", "loss", "accuracy"
+            ])
+            writer.writeheader()
+
+    def _append_round_log(self, round_no, phase, start_ts_ms, end_ts_ms, duration_s, train_samples, eval_samples, loss, accuracy):
+        with open(self.rounds_log_file, "a", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=[
+                "round", "phase", "start_ts_ms", "end_ts_ms", "duration_s",
+                "train_samples", "eval_samples", "loss", "accuracy"
+            ])
+            writer.writerow({
+                "round": round_no,
+                "phase": phase,
+                "start_ts_ms": int(start_ts_ms),
+                "end_ts_ms": int(end_ts_ms),
+                "duration_s": round(duration_s, 3),
+                "train_samples": train_samples,
+                "eval_samples": eval_samples,
+                "loss": "" if loss is None else round(float(loss), 6),
+                "accuracy": "" if accuracy is None else round(float(accuracy), 6),
+            })
 
 
     def get_properties(self, config):
@@ -54,6 +83,7 @@ class FlowerClient(fl.client.NumPyClient):
 
         try:
             round_start = time.time()
+            start_ts_ms = int(round_start * 1000)
             results = train(
                 self.net,
                 self.trainloader,
@@ -72,6 +102,17 @@ class FlowerClient(fl.client.NumPyClient):
                 accuracy=results.get("val_accuracy"),
             )
             logging.info(f"[fit, client {self.partition_id}] Global round {local_round} ended in {round_duration:.2f}s")
+            self._append_round_log(
+                round_no=local_round,
+                phase="fit",
+                start_ts_ms=start_ts_ms,
+                end_ts_ms=int(time.time() * 1000),
+                duration_s=round_duration,
+                train_samples=len(self.trainloader.dataset),
+                eval_samples=len(self.valloader.dataset),
+                loss=results.get("val_loss"),
+                accuracy=results.get("val_accuracy"),
+            )
 
             return get_weights(self.net), len(self.trainloader.dataset), results
         except Exception:
@@ -80,9 +121,23 @@ class FlowerClient(fl.client.NumPyClient):
 
 
     def evaluate(self, parameters, config):
+        global local_eval_round
+        local_eval_round += 1
+        eval_start = time.time()
         set_weights(self.net, parameters)
         loss, accuracy = test(self.net, self.valloader, self.device)
         logging.info(f"[evaluate, client {self.partition_id}] Test loss: {loss}, test accuracy: {accuracy}")
+        self._append_round_log(
+            round_no=local_eval_round,
+            phase="evaluate",
+            start_ts_ms=int(eval_start * 1000),
+            end_ts_ms=int(time.time() * 1000),
+            duration_s=time.time() - eval_start,
+            train_samples=len(self.trainloader.dataset),
+            eval_samples=len(self.valloader.dataset),
+            loss=loss,
+            accuracy=accuracy,
+        )
         #post_training_metrics(self.metrics_server_url, is_training=False, loss=loss, accuracy=accuracy)
         return loss, len(self.valloader.dataset), {"accuracy": accuracy,"loss":loss}
     
