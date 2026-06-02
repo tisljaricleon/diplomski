@@ -38,12 +38,13 @@ class LogAccuracyStrategy(FedAvg):
         # LOG PART START
         self.rounds_log_file = "/home/model/rounds_log.csv"
         self._round_start_times: dict[int, float] = {}
-        with open(self.rounds_log_file, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=[
-                "round", "start_ts_ms", "end_ts_ms", "duration_s",
-                "num_clients_selected", "selected_client_ids", "loss", "accuracy"
-            ])
-            writer.writeheader()
+        if not os.path.exists(self.rounds_log_file) or os.path.getsize(self.rounds_log_file) == 0:
+            with open(self.rounds_log_file, "w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=[
+                    "round", "start_ts_ms", "end_ts_ms", "duration_s",
+                    "num_clients_selected", "selected_client_ids", "loss", "accuracy"
+                ])
+                writer.writeheader()
         # LOG PART END
 
     def configure_fit(self, server_round, parameters, client_manager):
@@ -54,6 +55,17 @@ class LogAccuracyStrategy(FedAvg):
         fit_ins = FitIns(parameters, config)
 
         all_clients = list(client_manager.all().values())
+        while len(all_clients) < self.min_available_clients:
+            logging.info(
+                f"[configure_fit] Round {server_round}, waiting for clients "
+                f"({len(all_clients)}/{self.min_available_clients})"
+            )
+            try:
+                client_manager.wait_for(self.min_available_clients)
+            except Exception:
+                time.sleep(1.0)
+            all_clients = list(client_manager.all().values())
+
         client_names = [client.cid for client in all_clients]
         logging.info(f"[configure_fit] Round {server_round}, clients available: {client_names}")
 
@@ -115,6 +127,17 @@ class LogAccuracyStrategy(FedAvg):
         start_time = self._round_start_times.get(server_round, end_time)
         duration = end_time - start_time
         selected_client_ids = json.dumps([client_proxy.cid for client_proxy, _ in results])
+
+        # Reset file at the first completed round of each new run.
+        # If GA restarts mid-run (server_round > 1), keep existing rows.
+        if server_round == 1:
+            with open(self.rounds_log_file, "w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=[
+                    "round", "start_ts_ms", "end_ts_ms", "duration_s",
+                    "num_clients_selected", "selected_client_ids", "loss", "accuracy"
+                ])
+                writer.writeheader()
+
         with open(self.rounds_log_file, "a", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=[
                 "round", "start_ts_ms", "end_ts_ms", "duration_s",

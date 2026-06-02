@@ -199,7 +199,7 @@ func (orch *FlOrchestrator) monitorFlProgress() {
 			orch.progress.accuracies = append(orch.progress.accuracies, accuracy)
 			orch.logger.Info(fmt.Sprintf("Latest accuracy: %.2f", accuracy))
 
-			loss := getLatestLossFromLogs(logs, finishedGlobalRound)
+			loss := getLatestLossFromLogs(logs)
 			orch.progress.losses = append(orch.progress.losses, loss)
 			orch.logger.Info(fmt.Sprintf("Latest loss: %.2f", loss))
 
@@ -245,11 +245,6 @@ func (orch *FlOrchestrator) monitorFlProgress() {
 					if finishedGlobalRound == orch.reconfigurationEvaluator.evaluationRound {
 						orch.evaluateReconfiguration()
 					}
-				}
-
-				if finishedGlobalRound == 10 {
-					orch.logger.Info("Applying changes...")
-					applyChanges("../../configs/cluster/cluster.csv", "../../configs/cluster/changes.csv")
 				}
 
 			}
@@ -364,7 +359,7 @@ func (orch *FlOrchestrator) printConfiguration() {
 // HELPERS
 
 func getLatestAccuracyFromLogs(logs string) float32 {
-	pattern := `accuracy': ([0-9]*\.[0-9]+)`
+	pattern := `\[aggregate_evaluate\] Round \d+: client avg loss=[0-9.]+, accuracy=([0-9]*\.[0-9]+)`
 	r := regexp.MustCompile(pattern)
 
 	matches := r.FindAllStringSubmatch(logs, -1)
@@ -378,21 +373,10 @@ func getLatestAccuracyFromLogs(logs string) float32 {
 	return -1.0
 }
 
-func getLatestLossFromLogs(logs string, finishedGlobalRound int32) float32 {
-	// Define the regex patterns
-	patterns := []string{
-		`\(loss, other metrics\): ([\d.]+),`,
-		`fit progress: \(\d+, ([\d.]+),`,
-	}
+func getLatestLossFromLogs(logs string) float32 {
+	pattern := `\[aggregate_evaluate\] Round \d+: client avg loss=([0-9]*\.[0-9]+)`
+	re := regexp.MustCompile(pattern)
 
-	var re *regexp.Regexp
-	if finishedGlobalRound == 0 {
-		re = regexp.MustCompile(patterns[0])
-	} else {
-		re = regexp.MustCompile(patterns[1])
-	}
-
-	// Find all matches in the string
 	matches := re.FindAllStringSubmatch(logs, -1)
 
 	if len(matches) > 0 {
