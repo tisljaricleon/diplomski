@@ -38,10 +38,12 @@ class LogAccuracyStrategy(FedAvg):
         # LOG PART START
         self.rounds_log_file = "/home/model/rounds_log.csv"
         self._round_start_times: dict[int, float] = {}
+        self._eval_start_times: dict[int, float] = {}
         if not os.path.exists(self.rounds_log_file) or os.path.getsize(self.rounds_log_file) == 0:
             with open(self.rounds_log_file, "w", newline="") as f:
                 writer = csv.DictWriter(f, fieldnames=[
-                    "round", "start_ts_ms", "end_ts_ms", "duration_s",
+                    "round", "fit_start_ts_ms", "fit_end_ts_ms", "fit_duration_s",
+                    "eval_start_ts_ms", "eval_end_ts_ms", "eval_duration_s",
                     "num_clients_selected", "selected_client_ids", "loss", "accuracy"
                 ])
                 writer.writeheader()
@@ -114,6 +116,12 @@ class LogAccuracyStrategy(FedAvg):
         return [(proxy, fit_ins) for proxy, _ in selected_clients]
 
 
+    def configure_evaluate(self, server_round, parameters, client_manager):
+        # LOG PART START
+        self._eval_start_times[server_round] = time.time()
+        # LOG PART END
+        return super().configure_evaluate(server_round, parameters, client_manager)
+
     def aggregate_fit(self, server_round, results, failures):
         for client_proxy, fit_results in results:
             self.last_client_participation[client_proxy.cid] = server_round
@@ -133,21 +141,26 @@ class LogAccuracyStrategy(FedAvg):
         if server_round == 1:
             with open(self.rounds_log_file, "w", newline="") as f:
                 writer = csv.DictWriter(f, fieldnames=[
-                    "round", "start_ts_ms", "end_ts_ms", "duration_s",
+                    "round", "fit_start_ts_ms", "fit_end_ts_ms", "fit_duration_s",
+                    "eval_start_ts_ms", "eval_end_ts_ms", "eval_duration_s",
                     "num_clients_selected", "selected_client_ids", "loss", "accuracy"
                 ])
                 writer.writeheader()
 
         with open(self.rounds_log_file, "a", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=[
-                "round", "start_ts_ms", "end_ts_ms", "duration_s",
+                "round", "fit_start_ts_ms", "fit_end_ts_ms", "fit_duration_s",
+                "eval_start_ts_ms", "eval_end_ts_ms", "eval_duration_s",
                 "num_clients_selected", "selected_client_ids", "loss", "accuracy"
             ])
             writer.writerow({
                 "round": server_round,
-                "start_ts_ms": int(start_time * 1000),
-                "end_ts_ms": int(end_time * 1000),
-                "duration_s": round(duration, 3),
+                "fit_start_ts_ms": int(start_time * 1000),
+                "fit_end_ts_ms": int(end_time * 1000),
+                "fit_duration_s": round(duration, 3),
+                "eval_start_ts_ms": "",
+                "eval_end_ts_ms": "",
+                "eval_duration_s": "",
                 "num_clients_selected": len(results),
                 "selected_client_ids": selected_client_ids,
                 "loss": "",
@@ -170,18 +183,26 @@ class LogAccuracyStrategy(FedAvg):
         avg_accuracy = sum(evaluate_res.metrics.get("accuracy", 0.0) * evaluate_res.num_examples for _, evaluate_res in results) / total_samples
         logging.info(f"[aggregate_evaluate] Round {server_round}: client avg loss={avg_loss:.4f}, accuracy={avg_accuracy:.4f}")
 
+        eval_end_time = time.time()
+        eval_start_time = self._eval_start_times.get(server_round, eval_end_time)
+        eval_duration = eval_end_time - eval_start_time
+
         try:
             rows = []
             with open(self.rounds_log_file, "r", newline="") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if row["round"] == str(server_round) and row["loss"] == "":
+                        row["eval_start_ts_ms"] = int(eval_start_time * 1000)
+                        row["eval_end_ts_ms"] = int(eval_end_time * 1000)
+                        row["eval_duration_s"] = round(eval_duration, 3)
                         row["loss"] = round(avg_loss, 6)
                         row["accuracy"] = round(avg_accuracy, 6)
                     rows.append(row)
             with open(self.rounds_log_file, "w", newline="") as f:
                 writer = csv.DictWriter(f, fieldnames=[
-                    "round", "start_ts_ms", "end_ts_ms", "duration_s",
+                    "round", "fit_start_ts_ms", "fit_end_ts_ms", "fit_duration_s",
+                    "eval_start_ts_ms", "eval_end_ts_ms", "eval_duration_s",
                     "num_clients_selected", "selected_client_ids", "loss", "accuracy"
                 ])
                 writer.writeheader()
