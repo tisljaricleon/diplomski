@@ -20,7 +20,7 @@ CLIENT_MAP = [
         "port": 30380,          
         "endpoint": "/predict",
         "metrics_port": 30383,  
-        "load_rate": 200,      
+        "load_rate": 100,      
     },
     {
         "name": "orinnano-3",
@@ -28,7 +28,7 @@ CLIENT_MAP = [
         "port": 30381,         
         "endpoint": "/predict",
         "metrics_port": 30384,
-        "load_rate": 50,   
+        "load_rate": 100,
     },
     {
         "name": "orinnano-4",
@@ -36,7 +36,7 @@ CLIENT_MAP = [
         "port": 30382,         
         "endpoint": "/predict",
         "metrics_port": 30385,
-        "load_rate": 50,
+        "load_rate": 100,
     },
 ]
 
