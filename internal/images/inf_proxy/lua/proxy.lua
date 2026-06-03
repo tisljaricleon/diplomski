@@ -84,19 +84,25 @@ end
 
 counter:incr("inflight", 1, 0)
 
-local upstream_client = http.new()
-upstream_client:set_timeout(60000)
 local body = ngx.req.get_body_data()
 local headers = ngx.req.get_headers()
+local method  = ngx.req.get_method()
 
-local upstream_request, upstream_error = upstream_client:request_uri(
-    target_url .. "/predict",
-    {
-        method  = ngx.req.get_method(),
-        headers = headers,
-        body    = body,
-    }
-)
+local upstream_request, upstream_error
+for attempt = 1, 2 do
+    local upstream_client = http.new()
+    upstream_client:set_timeout(60000)
+    upstream_request, upstream_error = upstream_client:request_uri(
+        target_url .. "/predict",
+        {
+            method  = method,
+            headers = headers,
+            body    = body,
+        }
+    )
+    if upstream_request then break end
+    ngx.log(ngx.WARN, "[proxy] Upstream error (attempt ", attempt, "): ", upstream_error, " — ", attempt < 2 and "retrying" or "giving up")
+end
 
 counter:incr("inflight", -1, 0)
 
