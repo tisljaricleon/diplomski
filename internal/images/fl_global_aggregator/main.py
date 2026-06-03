@@ -2,6 +2,7 @@ import torch
 import flwr as fl
 import logging
 import csv
+import datetime
 import json
 import os
 import time
@@ -36,7 +37,8 @@ class LogAccuracyStrategy(FedAvg):
         self.last_client_participation: dict[str, int] = {}
 
         # LOG PART START
-        self.rounds_log_file = "/home/model/rounds_log.csv"
+        _ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.rounds_log_file = f"/home/model/rounds_log_{_ts}.csv"
         self._round_start_times: dict[int, float] = {}
         self._eval_start_times: dict[int, float] = {}
         if not os.path.exists(self.rounds_log_file) or os.path.getsize(self.rounds_log_file) == 0:

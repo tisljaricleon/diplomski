@@ -1,6 +1,7 @@
 import argparse
 import csv
-import datetime as dt
+import datetime
+import datetime as dt  # kept as dt for any existing usage
 import getpass
 import os
 import signal
@@ -70,9 +71,10 @@ def run(output_path: str, interval_s: float) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Log jtop device stats to CSV.")
+    _ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     parser.add_argument(
-        "--output", default="jtop_logs.csv",
-        help="Output CSV file (default: jtop_logs.csv)",
+        "--output", default=f"jtop_logs_{_ts}.csv",
+        help="Output CSV file (default: jtop_logs_<timestamp>.csv)",
     )
     parser.add_argument(
         "--interval", type=float, default=1.0,

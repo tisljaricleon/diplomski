@@ -1,5 +1,6 @@
 import argparse
 import csv
+import datetime
 import getpass
 import os
 import signal
@@ -93,9 +94,10 @@ def run(output_path: str, interval_s: float) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Log device stats to CSV (Raspberry Pi).")
+    _ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     parser.add_argument(
-        "--output", default="rpi_logs.csv",
-        help="Output CSV file (default: rpi_logs.csv)",
+        "--output", default=f"rpi_logs_{_ts}.csv",
+        help="Output CSV file (default: rpi_logs_<timestamp>.csv)",
     )
     parser.add_argument(
         "--interval", type=float, default=1.0,

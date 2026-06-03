@@ -34,4 +34,5 @@ scripts/set_labels_*
 
 experiments/*
 
-/testing/
+/testing/data
+/testing/__pycache__
