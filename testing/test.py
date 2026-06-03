@@ -20,7 +20,7 @@ CLIENT_MAP = [
         "port": 30380,          
         "endpoint": "/predict",
         "metrics_port": 30383,  
-        "load_rate": 100,      
+        "load_rate": 200,      
     },
     {
         "name": "orinnano-3",
