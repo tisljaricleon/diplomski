@@ -4,15 +4,15 @@ curl -X POST http://10.19.4.45:8080/fl/start \
     "trainingParams": {
       "epochs": 5,
       "localRounds": 2,
-      "globalRounds": 20,
-      "minFitClients": 2,
-      "minEvaluateClients": 2,
+      "globalRounds": 16,
+      "minFitClients": 3,
+      "minEvaluateClients": 3,
       "minAvailableClients": 3,
       "batchSize": 64,
       "learningRate": 0.0003,
       "aomRoundsThreshold": 2,
-      "aomSelectionEnabled": true,
-      "inflightThreshold": 15.0
+      "aomSelectionEnabled": false,
+      "inflightThreshold": 100005.0
     },
     "inferenceParams": {
       "enableServing": true
