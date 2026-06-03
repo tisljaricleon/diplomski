@@ -8,6 +8,15 @@ local parent_service_url = os.getenv("PARENT_SERVICE_URL") or ""
 local max_inflight       = tonumber(os.getenv("MAX_INFLIGHT")) or 99999
 local training_refresh_s = (tonumber(os.getenv("TRAINING_METRICS_REFRESH_MS")) or 1000) / 1000
 local inflight           = counter:get("inflight") or 0
+local avg_inflight       = (function()
+    local total, count, now = 0, 0, ngx.now()
+    for i = 0, 59 do
+        local t = counter:get("s_t_" .. i)
+        local v = counter:get("s_v_" .. i)
+        if t and v and (now - t) <= 60 then total = total + v; count = count + 1 end
+    end
+    return count > 0 and (total / count) or 0
+end)()
 local is_training        = false
 
 
@@ -59,7 +68,7 @@ if parent_service_url ~= "" then
         is_training = (cached_training_after == 1)
     end
 
-    if is_training and inflight > max_inflight then
+    if is_training and avg_inflight > max_inflight then
         target_url = parent_service_url
     end
 
@@ -68,7 +77,7 @@ end
 
 local last_target = counter:get("last_target") or ""
 if last_target ~= target_url then
-    ngx.log(ngx.WARN, "[proxy] SWITCHED ", last_target == "" and "(init)" or last_target, " -> ", target_url, " inflight=", inflight, " is_training=", tostring(is_training))
+    ngx.log(ngx.WARN, "[proxy] SWITCHED ", last_target == "" and "(init)" or last_target, " -> ", target_url, " avg_inflight=", avg_inflight, " is_training=", tostring(is_training))
     counter:set("last_target", target_url)
 end
 
