@@ -29,7 +29,7 @@ func (orch *FlOrchestrator) deployInfStack(nodeType string, nodeId string, paren
 		parentServiceURL = fmt.Sprintf("http://%s", common.GetInfSvcClusterAddress(parentNodeId))
 	}
 
-	if err := orch.contOrch.CreateInfProxy(nodeId, proxyConfigFiles, parentServiceURL); err != nil {
+	if err := orch.contOrch.CreateInfProxy(nodeId, proxyConfigFiles, parentServiceURL, orch.inflightThreshold); err != nil {
 		_ = orch.contOrch.RemoveInfService(nodeId)
 		return err
 	}

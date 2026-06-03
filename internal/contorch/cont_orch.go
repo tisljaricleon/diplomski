@@ -25,6 +25,6 @@ type IContainerOrchestrator interface {
 	CreateInfService(nodeType string, nodeId string, configFiles map[string]string) error
 	RemoveInfService(nodeId string) error
 
-	CreateInfProxy(nodeId string, configFiles map[string]string, parentServiceURL string) error
+	CreateInfProxy(nodeId string, configFiles map[string]string, parentServiceURL string, maxInflight float32) error
 	RemoveInfProxy(nodeId string) error
 }

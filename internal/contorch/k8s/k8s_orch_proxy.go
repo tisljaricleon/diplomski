@@ -27,7 +27,7 @@ func (orch *K8sOrchestrator) getInfProxyRuntime(nodeId string) (string, int32, i
 	return image, node.Labels.InfProxy.NodePort, node.Labels.InfProxy.MetricsNodePort, nil
 }
 
-func (orch *K8sOrchestrator) CreateInfProxy(nodeId string, configFiles map[string]string, parentServiceURL string) error {
+func (orch *K8sOrchestrator) CreateInfProxy(nodeId string, configFiles map[string]string, parentServiceURL string, maxInflight float32) error {
 	if err := orch.createConfigMapFromFiles(common.GetInfProxyConfigMapName(nodeId), configFiles); err != nil {
 		return err
 	}
@@ -44,6 +44,7 @@ func (orch *K8sOrchestrator) CreateInfProxy(nodeId string, configFiles map[strin
 		image,
 		localServiceURL,
 		parentServiceURL,
+		maxInflight,
 	)
 	deployment.Spec.Template.Spec.NodeName = nodeId
 	if err := orch.createDeployment(deployment); err != nil {

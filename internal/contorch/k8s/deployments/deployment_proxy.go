@@ -1,6 +1,8 @@
 package k8sorch
 
 import (
+	"fmt"
+
 	"github.com/AIoTwin-Adaptive-FL-Orch/fl-orchestrator/internal/common"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -8,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func BuildInfProxyDeployment(nodeId, namespace, image, localServiceURL, parentServiceURL string) *appsv1.Deployment {
+func BuildInfProxyDeployment(nodeId, namespace, image, localServiceURL, parentServiceURL string, maxInflight float32) *appsv1.Deployment {
 	labelValue := "proxy-" + nodeId
 	volumeMounts := []corev1.VolumeMount{
 		{
@@ -57,7 +59,7 @@ func BuildInfProxyDeployment(nodeId, namespace, image, localServiceURL, parentSe
 	env := []corev1.EnvVar{
 		{Name: "LOCAL_SERVICE_URL", Value: localServiceURL},
 		{Name: "PARENT_SERVICE_URL", Value: parentServiceURL},
-		{Name: "MAX_INFLIGHT", Value: "999999"},
+		{Name: "MAX_INFLIGHT", Value: fmt.Sprintf("%g", maxInflight)},
 	}
 
 	return &appsv1.Deployment{
