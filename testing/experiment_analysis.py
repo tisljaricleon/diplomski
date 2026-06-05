@@ -37,6 +37,8 @@ EXPERIMENTS = {
     'B2': {'label': 'B2\n250 req/s\n(AOM off)', 'short': 'B2 - 250 req/s',       'color': '#F44336', 'marker': '^', 'aom': False},
     'C1': {'label': 'C1\n250 req/s\n(AOM on)',  'short': 'C1 - 250 req/s + AOM', 'color': '#9C27B0', 'marker': 'D', 'aom': True},
     'C2': {'label': 'C2\n400 req/s\n(AOM on)',  'short': 'C2 - 400 req/s + AOM', 'color': '#4CAF50', 'marker': 'P', 'aom': True},
+    'D1': {'label': 'D1\n250 req/s\n(AOM on)',  'short': 'D1 - 250 req/s + AOM', 'color': '#00BCD4', 'marker': '*', 'aom': True},
+    'D2': {'label': 'D2\n200 req/s\n(AOM off)', 'short': 'D2 - 200 req/s',       'color': '#795548', 'marker': 'v', 'aom': False},
 }
 
 GA_LOGS = {
@@ -45,6 +47,8 @@ GA_LOGS = {
     'B2': 'round_logs/rounds_log_20260603_182319.csv',
     'C1': 'round_logs/rounds_log_20260603_192347.csv',
     'C2': 'round_logs/rounds_log_20260603_202002.csv',
+    'D1': 'round_logs/rounds_log_20260604_222726.csv',
+    'D2': 'round_logs/rounds_log_20260604_232456.csv',
 }
 
 PROXY_FILES = {
@@ -52,6 +56,8 @@ PROXY_FILES = {
     'B2': 'request_and_proxy_metrics/runtime_metrics_round_with_proxy_20260603_211837.csv',
     'C1': 'request_and_proxy_metrics/runtime_metrics_round_with_proxy_20260603_221738.csv',
     'C2': 'request_and_proxy_metrics/runtime_metrics_round_with_proxy_20260603_231156.csv',
+    'D1': 'runtime_metrics_round_with_proxy_20260605_011957.csv',
+    'D2': 'runtime_metrics_round_with_proxy_20260605_021853.csv',
 }
 
 REQUEST_FILES = {
@@ -59,6 +65,8 @@ REQUEST_FILES = {
     'B2': 'request_and_proxy_metrics/request_data_round_with_proxy_20260603_211837.csv',
     'C1': 'request_and_proxy_metrics/request_data_round_with_proxy_20260603_221738.csv',
     'C2': 'request_and_proxy_metrics/request_data_round_with_proxy_20260603_231156.csv',
+    'D1': 'request_data_round_with_proxy_20260605_011957.csv',
+    'D2': 'request_data_round_with_proxy_20260605_021853.csv',
 }
 
 CLIENT_LOGS = {
@@ -77,6 +85,12 @@ CLIENT_LOGS = {
     'C2': ('client_logs_orinnano2/client_rounds_log_p0_20260603_202214.csv',
            'client_logs_orinnano3/client_rounds_log_p1_20260603_202212.csv',
            'client_logs_orinnano4/client_rounds_log_p2_20260603_202213.csv'),
+    'D1': ('client_logs_orinnano2/client_rounds_log_p0_20260604_222951.csv',
+           'client_logs_orinnano3/client_rounds_log_p1_20260604_223001.csv',
+           'client_logs_orinnano4/client_rounds_log_p2_20260604_222956.csv'),
+    'D2': ('client_logs_orinnano2/client_rounds_log_p0_20260604_232741.csv',
+           'client_logs_orinnano3/client_rounds_log_p1_20260604_232728.csv',
+           'client_logs_orinnano4/client_rounds_log_p2_20260604_232727.csv'),
 }
 
 
@@ -180,12 +194,12 @@ def plot_avg_duration_bar():
 
 
 # ============================================================
-# PLOT 3 - Load effect: A, B1, B2
+# PLOT 3 - Load effect: A, B1, B2, D2
 # ============================================================
 def plot_load_effect():
     fig, ax = plt.subplots(figsize=(10, 5))
     a_mean = np.mean([float(r['fit_duration_s']) for r in load_ga('A')])
-    for key in ['A', 'B1', 'B2']:
+    for key in ['A', 'B1', 'D2', 'B2']:
         rows = load_ga(key)
         rnds = [int(r['round']) for r in rows]
         durs = [float(r['fit_duration_s']) for r in rows]
@@ -196,18 +210,18 @@ def plot_load_effect():
                linestyle='--', alpha=0.5, label=f'Baseline mean ({a_mean:.1f}s)')
     ax.set_xlabel('FL Round')
     ax.set_ylabel('Fit Duration (s)')
-    ax.set_title('Effect of Inference Load on FL Round Duration (AOM off)')
+    ax.set_title('Effect of Inference Load on FL Round Duration (AOM off)\nA=baseline, B1=100, D2=200, B2=250 req/s')
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.3)
     save(fig, '03_load_effect_no_aom.png')
 
 
 # ============================================================
-# PLOT 4 - AOM benefit: B2 vs C1 vs C2
+# PLOT 4 - AOM benefit: B2 vs C1 vs C2 vs D1
 # ============================================================
 def plot_aom_benefit():
     fig, ax = plt.subplots(figsize=(11, 5))
-    for key in ['B2', 'C1', 'C2']:
+    for key in ['B2', 'C1', 'C2', 'D1']:
         rows = load_ga(key)
         rnds = [int(r['round']) for r in rows]
         durs = [float(r['fit_duration_s']) for r in rows]
@@ -220,14 +234,20 @@ def plot_aom_benefit():
             ax.axvline(x=int(r['round']), color=EXPERIMENTS['C2']['color'],
                        alpha=0.18, linewidth=6, zorder=0)
 
-    excl_line = mpatches.Patch(color=EXPERIMENTS['C2']['color'], alpha=0.35,
-                               label='C2 round: AOM excluded overloaded client')
+    for r in load_ga('D1'):
+        if int(r['num_clients_selected']) < 3:
+            ax.axvline(x=int(r['round']), color=EXPERIMENTS['D1']['color'],
+                       alpha=0.18, linewidth=6, zorder=0)
+    excl_c2 = mpatches.Patch(color=EXPERIMENTS['C2']['color'], alpha=0.35,
+                              label='C2 round: AOM excluded overloaded client')
+    excl_d1 = mpatches.Patch(color=EXPERIMENTS['D1']['color'], alpha=0.35,
+                              label='D1 round: AOM excluded overloaded client')
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles=handles + [excl_line], fontsize=9)
+    ax.legend(handles=handles + [excl_c2, excl_d1], fontsize=9)
     ax.set_xlabel('FL Round')
     ax.set_ylabel('Fit Duration (s)')
-    ax.set_title('AOM Benefit: B2 (250 req/s no AOM) vs C1/C2 (AOM on)\n'
-                 'Shaded columns = rounds where AOM excluded orinnano-2 in C2')
+    ax.set_title('AOM Benefit: B2 (250 req/s no AOM) vs C1/C2/D1 (AOM on)\n'
+                 'Shaded columns = rounds where AOM excluded overloaded client')
     ax.grid(True, alpha=0.3)
     save(fig, '04_aom_benefit.png')
 
@@ -291,8 +311,8 @@ def plot_final_accuracy_bar():
 # PLOT 7 - AOM client selection timeline C1 and C2
 # ============================================================
 def plot_aom_timeline():
-    fig, axes = plt.subplots(2, 1, figsize=(12, 7))
-    for ax, key in zip(axes, ['C1', 'C2']):
+    fig, axes = plt.subplots(3, 1, figsize=(12, 10))
+    for ax, key in zip(axes, ['C1', 'C2', 'D1']):
         rows = load_ga(key)
         rnds = [int(r['round']) for r in rows]
         n_sel = [int(r['num_clients_selected']) for r in rows]
@@ -321,7 +341,7 @@ def plot_aom_timeline():
 # ============================================================
 def plot_inflight_comparison():
     fig, ax = plt.subplots(figsize=(13, 5))
-    for key in ['B1', 'B2', 'C1', 'C2']:
+    for key in ['B1', 'B2', 'C1', 'C2', 'D1', 'D2']:
         rel, vals = proxy_inflight_o2(key)
         m = EXPERIMENTS[key]
         ax.plot(rel, vals, color=m['color'], linewidth=1.4, label=m['short'], alpha=0.9)
@@ -475,7 +495,7 @@ def plot_cumulative_time():
 def plot_request_latency():
     fig, ax = plt.subplots(figsize=(10, 5))
     data, labels, colors_bp = [], [], []
-    for key in ['B1', 'B2', 'C1', 'C2']:
+    for key in ['B1', 'B2', 'C1', 'C2', 'D1', 'D2']:
         with open(REQUEST_FILES[key]) as f:
             rows = [r for r in csv.DictReader(f)
                     if r.get('client_name', '') == 'orinnano-2'
