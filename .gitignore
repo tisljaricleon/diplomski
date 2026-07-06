@@ -36,3 +36,5 @@ experiments/*
 
 /testing/data
 /testing/__pycache__
+
+analyze.py

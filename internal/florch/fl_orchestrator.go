@@ -147,6 +147,7 @@ func (orch *FlOrchestrator) Start() error {
 	orch.eventBus.Subscribe(common.NODE_STATE_CHANGE_EVENT_TYPE, nodeStateChangeChan)
 	go orch.nodeStateChangeHandler(nodeStateChangeChan)
 
+	// func. used in simulation mode
 	//go orch.contOrch.StartNodeStateChangeNotifier()
 
 	flFinishedChan := make(chan events.Event)

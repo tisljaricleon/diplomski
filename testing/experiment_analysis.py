@@ -3,15 +3,15 @@
 FL Orchestrator - Experiment Analysis
 ======================================
 Proves two goals from the experiment plan:
-  1. FL round duration is shorter when AOM selection excludes overloaded clients
-  2. Model accuracy does not degrade when AOM client selection is active
+  1. FL round duration is shorter when AoM selection excludes overloaded clients
+  2. Model accuracy does not degrade when AoM client selection is active
 
 Experiment sequence (oldest -> newest filename timestamp):
-  A  - baseline_no_load  : no requests, AOM off
-  B1 - 100 req/s         : 100 req/s per client, AOM off
-  B2 - 250 req/s         : 250 req/s per client, AOM off
-  C1 - 250 req/s + AOM   : 250 req/s per client, AOM on  (threshold = 15)
-  C2 - 400 req/s + AOM   : 400 req/s per client, AOM on  (threshold = 15)
+  A  - baseline_no_load  : no requests, AoM off
+    B1 - 100 zahtjeva/s    : 100 zahtjeva/s po klijentu, AoM isključen
+    B2 - 250 zahtjeva/s    : 250 zahtjeva/s po klijentu, AoM isključen
+    C1 - 250 zahtjeva/s + AoM   : 250 zahtjeva/s po klijentu, AoM uključen  (prag = 15)
+    C2 - 400 zahtjeva/s + AoM   : 400 zahtjeva/s po klijentu, AoM uključen  (prag = 15)
 
 File mapping confirmed by aligning actual timestamps inside each CSV.
 """
@@ -29,75 +29,90 @@ import matplotlib.patches as mpatches
 # Output directory
 OUT_DIR = 'experiment_plots'
 os.makedirs(OUT_DIR, exist_ok=True)
+MAX_ROUND = 15
 
 # Experiment metadata
+'''
 EXPERIMENTS = {
-    'A':  {'label': 'A\nBaseline\n(no load)',   'short': 'A - Baseline',         'color': '#2196F3', 'marker': 'o', 'aom': False},
-    'B1': {'label': 'B1\n100 req/s\n(AOM off)', 'short': 'B1 - 100 req/s',       'color': '#FF9800', 'marker': 's', 'aom': False},
-    'B2': {'label': 'B2\n250 req/s\n(AOM off)', 'short': 'B2 - 250 req/s',       'color': '#F44336', 'marker': '^', 'aom': False},
-    'C1': {'label': 'C1\n250 req/s\n(AOM on)',  'short': 'C1 - 250 req/s + AOM', 'color': '#9C27B0', 'marker': 'D', 'aom': True},
-    'C2': {'label': 'C2\n400 req/s\n(AOM on)',  'short': 'C2 - 400 req/s + AOM', 'color': '#4CAF50', 'marker': 'P', 'aom': True},
-    'D1': {'label': 'D1\n250 req/s\n(AOM on)',  'short': 'D1 - 250 req/s + AOM', 'color': '#00BCD4', 'marker': '*', 'aom': True},
-    'D2': {'label': 'D2\n200 req/s\n(AOM off)', 'short': 'D2 - 200 req/s',       'color': '#795548', 'marker': 'v', 'aom': False},
+    'A':  {'label': 'A\nBaseline\n(no load)',   'short': 'A - 0 req/s',         'color': '#2196F3', 'marker': 'o', 'AoM': False},
+    'B1': {'label': 'B1\n100 req/s\n(AoM off)', 'short': 'B1 - 100 req/s',        'color': '#FF9800', 'marker': 's', 'AoM': False},
+    'B2': {'label': 'B2\n200 req/s\n(AoM off)', 'short': 'B2 - 200 req/s',        'color': '#F44336', 'marker': 's', 'AoM': False},
+    'C1': {'label': 'C1\n250 req/s\n(AoM on)',  'short': 'C1 - 250 req/s + AoM',  'color': '#00BCD4', 'marker': '^', 'AoM': True},
+    'C2': {'label': 'C2\n400 req/s\n(AoM on)',  'short': 'C2 - 400 req/s + AoM',  'color': '#4CAF50', 'marker': '^', 'AoM': True},
+}
+'''
+EXPERIMENTS = {
+    'A':  {'label': 'A\nReferentni slučaj\n(bez opterećenja)',   'short': 'A - 0 zahtjeva/s',         'color': '#2196F3', 'marker': 'o', 'AoM': False},
+    'B1': {'label': 'B1\n100 zahtjeva/s\n(AoM isključen)', 'short': 'B1 - 100 zahtjeva/s',        'color': '#FF9800', 'marker': 's', 'AoM': False},
+    'B2': {'label': 'B2\n200 zahtjeva/s\n(AoM isključen)', 'short': 'B2 - 200 zahtjeva/s',        'color': '#F44336', 'marker': 's', 'AoM': False},
+    'C1': {'label': 'C1\n250 zahtjeva/s\n(AoM uključen)',  'short': 'C1 - 250 zahtjeva/s + AoM',  'color': '#00BCD4', 'marker': '^', 'AoM': True},
+    'C2': {'label': 'C2\n400 zahtjeva/s\n(AoM uključen)',  'short': 'C2 - 400 zahtjeva/s + AoM',  'color': '#4CAF50', 'marker': '^', 'AoM': True},
 }
 
 GA_LOGS = {
     'A':  'round_logs/rounds_log_20260603_160117.csv',
-    'B1': 'round_logs/rounds_log_20260603_170001.csv',
-    'B2': 'round_logs/rounds_log_20260603_182319.csv',
-    'C1': 'round_logs/rounds_log_20260603_192347.csv',
     'C2': 'round_logs/rounds_log_20260603_202002.csv',
-    'D1': 'round_logs/rounds_log_20260604_222726.csv',
-    'D2': 'round_logs/rounds_log_20260604_232456.csv',
+    'C1': 'round_logs/rounds_log_20260604_222726.csv',
+    'B2': 'round_logs/rounds_log_20260604_232456.csv',
+    'B1': 'round_logs/rounds_log_20260605_010228.csv',
 }
 
 PROXY_FILES = {
-    'B1': 'request_and_proxy_metrics/runtime_metrics_round_with_proxy_20260603_195523.csv',
-    'B2': 'request_and_proxy_metrics/runtime_metrics_round_with_proxy_20260603_211837.csv',
-    'C1': 'request_and_proxy_metrics/runtime_metrics_round_with_proxy_20260603_221738.csv',
     'C2': 'request_and_proxy_metrics/runtime_metrics_round_with_proxy_20260603_231156.csv',
-    'D1': 'runtime_metrics_round_with_proxy_20260605_011957.csv',
-    'D2': 'runtime_metrics_round_with_proxy_20260605_021853.csv',
+    'C1': 'runtime_metrics_round_with_proxy_20260605_011957.csv',
+    'B2': 'runtime_metrics_round_with_proxy_20260605_021853.csv',
+    'B1': 'runtime_metrics_round_with_proxy_20260605_035737.csv',
 }
 
 REQUEST_FILES = {
-    'B1': 'request_and_proxy_metrics/request_data_round_with_proxy_20260603_195523.csv',
-    'B2': 'request_and_proxy_metrics/request_data_round_with_proxy_20260603_211837.csv',
-    'C1': 'request_and_proxy_metrics/request_data_round_with_proxy_20260603_221738.csv',
     'C2': 'request_and_proxy_metrics/request_data_round_with_proxy_20260603_231156.csv',
-    'D1': 'request_data_round_with_proxy_20260605_011957.csv',
-    'D2': 'request_data_round_with_proxy_20260605_021853.csv',
+    'C1': 'request_data_round_with_proxy_20260605_011957.csv',
+    'B2': 'request_data_round_with_proxy_20260605_021853.csv',
+    'B1': 'request_data_round_with_proxy_20260605_035737.csv',
 }
 
 CLIENT_LOGS = {
     'A':  ('client_logs_orinnano2/client_rounds_log_p0_20260603_160339.csv',
            'client_logs_orinnano3/client_rounds_log_p1_20260603_160344.csv',
            'client_logs_orinnano4/client_rounds_log_p2_20260603_160342.csv'),
-    'B1': ('client_logs_orinnano2/client_rounds_log_p0_20260603_170233.csv',
-           'client_logs_orinnano3/client_rounds_log_p1_20260603_170233.csv',
-           'client_logs_orinnano4/client_rounds_log_p2_20260603_170233.csv'),
-    'B2': ('client_logs_orinnano2/client_rounds_log_p0_20260603_182541.csv',
-           'client_logs_orinnano3/client_rounds_log_p1_20260603_182538.csv',
-           'client_logs_orinnano4/client_rounds_log_p2_20260603_182542.csv'),
-    'C1': ('client_logs_orinnano2/client_rounds_log_p0_20260603_192623.csv',
-           'client_logs_orinnano3/client_rounds_log_p1_20260603_192624.csv',
-           'client_logs_orinnano4/client_rounds_log_p2_20260603_192631.csv'),
     'C2': ('client_logs_orinnano2/client_rounds_log_p0_20260603_202214.csv',
            'client_logs_orinnano3/client_rounds_log_p1_20260603_202212.csv',
            'client_logs_orinnano4/client_rounds_log_p2_20260603_202213.csv'),
-    'D1': ('client_logs_orinnano2/client_rounds_log_p0_20260604_222951.csv',
+    'C1': ('client_logs_orinnano2/client_rounds_log_p0_20260604_222951.csv',
            'client_logs_orinnano3/client_rounds_log_p1_20260604_223001.csv',
            'client_logs_orinnano4/client_rounds_log_p2_20260604_222956.csv'),
-    'D2': ('client_logs_orinnano2/client_rounds_log_p0_20260604_232741.csv',
+    'B2': ('client_logs_orinnano2/client_rounds_log_p0_20260604_232741.csv',
            'client_logs_orinnano3/client_rounds_log_p1_20260604_232728.csv',
            'client_logs_orinnano4/client_rounds_log_p2_20260604_232727.csv'),
+    'B1': ('client_logs_orinnano2/client_rounds_log_p0_20260605_010502.csv',
+           'client_logs_orinnano3/client_rounds_log_p1_20260605_010500.csv',
+           'client_logs_orinnano4/client_rounds_log_p2_20260605_010500.csv'),
+}
+
+# Raspberry Pi (global aggregator) CPU logs mapped to experiments by nearest start timestamp.
+RPI_LOGS = {
+    'A':  'rpi_logs/rpi_logs_20260603_180206.csv',
+    'C2': 'rpi_logs/rpi_logs_20260603_222226.csv',
+    'C1': 'rpi_logs/rpi_logs_20260605_002937.csv',
+    'B2': 'rpi_logs/rpi_logs_20260605_012756.csv',
+    # No dedicated RPi CPU log segment found for B1.
 }
 
 
 def load_ga(key):
     with open(GA_LOGS[key]) as f:
         rows = list(csv.DictReader(f))
-    return [r for r in rows if r.get('accuracy', '').strip() != '']
+    filtered = []
+    for r in rows:
+        if r.get('accuracy', '').strip() == '':
+            continue
+        try:
+            if int(r.get('round', 0)) > MAX_ROUND:
+                continue
+        except ValueError:
+            continue
+        filtered.append(r)
+    return filtered
 
 
 def load_proxy(key):
@@ -146,12 +161,15 @@ def plot_per_round_duration():
         m = EXPERIMENTS[key]
         ax.plot(rnds, durs, marker=m['marker'], color=m['color'],
                 label=m['short'], linewidth=1.8, markersize=5)
-    ax.set_xlabel('FL Round')
-    ax.set_ylabel('Fit Duration (s)')
-    ax.set_title('Per-Round FL Fit Duration - All Experiments')
+    #ax.set_xlabel('FL Round')
+    #ax.set_ylabel('Fit Duration (s)')
+    #ax.set_title('FL Fit Duration per Global Round')
+    ax.set_xlabel('Redni broj globalne runde')
+    ax.set_ylabel('Trajanje treniranja (s)')
+    ax.set_title('Trajanje treniranja po globalnoj rundi')
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.3)
-    save(fig, '01_per_round_duration.png')
+    save(fig, '01_global_round_fit_duration.png')
 
 
 # ============================================================
@@ -175,53 +193,28 @@ def plot_avg_duration_bar():
         ax.text(i, v + e + 1.5, f'{v:.1f}s', ha='center', va='bottom',
                 fontsize=10, fontweight='bold')
 
-    b2i, c2i = 2, 4
+    # indices in EXPERIMENTS order: A=0, B1=1, B2=2, C1=3, C2=4
+    b2i, c2i = 2, 3
     gain = avgs[b2i] - avgs[c2i]
     y_top = max(avgs[b2i] + stds[b2i], avgs[c2i] + stds[c2i]) + 14
     ax.annotate('', xy=(c2i, y_top - 4), xytext=(b2i, y_top - 4),
                 arrowprops=dict(arrowstyle='<->', color='darkgreen', lw=2))
-    ax.text((b2i + c2i) / 2, y_top + 1,
-            f'AOM saves approx {gain:.1f}s/round\n(higher load, shorter duration)',
-            ha='center', fontsize=9, color='darkgreen',
-            bbox=dict(boxstyle='round,pad=0.3', facecolor='#e8f5e9', edgecolor='darkgreen'))
 
     ax.set_xticks(range(len(keys)))
     ax.set_xticklabels(xlabels, fontsize=9)
     ax.set_ylabel('Average Fit Duration (s)')
-    ax.set_title('Average FL Round Fit Duration +/- Std Dev\n(Goal 1: AOM reduces round duration under load)')
+    ax.set_title('Average Global FL Round Fit Duration (+/- Standard Deviation)\n')
     ax.grid(axis='y', alpha=0.3)
-    save(fig, '02_avg_duration_bar.png')
+    save(fig, '02_avg_global_round_fit_duration.png')
 
 
 # ============================================================
-# PLOT 3 - Load effect: A, B1, B2, D2
 # ============================================================
-def plot_load_effect():
-    fig, ax = plt.subplots(figsize=(10, 5))
-    a_mean = np.mean([float(r['fit_duration_s']) for r in load_ga('A')])
-    for key in ['A', 'B1', 'D2', 'B2']:
-        rows = load_ga(key)
-        rnds = [int(r['round']) for r in rows]
-        durs = [float(r['fit_duration_s']) for r in rows]
-        m = EXPERIMENTS[key]
-        ax.plot(rnds, durs, marker=m['marker'], color=m['color'],
-                label=m['short'], linewidth=2, markersize=6)
-    ax.axhline(y=a_mean, color=EXPERIMENTS['A']['color'],
-               linestyle='--', alpha=0.5, label=f'Baseline mean ({a_mean:.1f}s)')
-    ax.set_xlabel('FL Round')
-    ax.set_ylabel('Fit Duration (s)')
-    ax.set_title('Effect of Inference Load on FL Round Duration (AOM off)\nA=baseline, B1=100, D2=200, B2=250 req/s')
-    ax.legend(fontsize=9)
-    ax.grid(True, alpha=0.3)
-    save(fig, '03_load_effect_no_aom.png')
-
-
+# PLOT 4 - AoM benefit: B2 vs C1 vs C2 vs D1
 # ============================================================
-# PLOT 4 - AOM benefit: B2 vs C1 vs C2 vs D1
-# ============================================================
-def plot_aom_benefit():
+def plot_AoM_benefit():
     fig, ax = plt.subplots(figsize=(11, 5))
-    for key in ['B2', 'C1', 'C2', 'D1']:
+    for key in ['B2', 'C1', 'C2']:
         rows = load_ga(key)
         rnds = [int(r['round']) for r in rows]
         durs = [float(r['fit_duration_s']) for r in rows]
@@ -234,20 +227,23 @@ def plot_aom_benefit():
             ax.axvline(x=int(r['round']), color=EXPERIMENTS['C2']['color'],
                        alpha=0.18, linewidth=6, zorder=0)
 
-    for r in load_ga('D1'):
-        if int(r['num_clients_selected']) < 3:
-            ax.axvline(x=int(r['round']), color=EXPERIMENTS['D1']['color'],
-                       alpha=0.18, linewidth=6, zorder=0)
+    for key_excl in ['C1', 'C2']:
+        for r in load_ga(key_excl):
+            if int(r['num_clients_selected']) < 3:
+                ax.axvline(x=int(r['round']), color=EXPERIMENTS[key_excl]['color'],
+                           alpha=0.18, linewidth=6, zorder=0)
+    #excl_c2 = mpatches.Patch(color=EXPERIMENTS['C2']['color'], alpha=0.35,
+    #                          label='Rounds where AoM excluded overloaded client')
     excl_c2 = mpatches.Patch(color=EXPERIMENTS['C2']['color'], alpha=0.35,
-                              label='C2 round: AOM excluded overloaded client')
-    excl_d1 = mpatches.Patch(color=EXPERIMENTS['D1']['color'], alpha=0.35,
-                              label='D1 round: AOM excluded overloaded client')
+                              label='Globalne runde u kojima je AoM isključio preopterećenog klijenta')
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles=handles + [excl_c2, excl_d1], fontsize=9)
-    ax.set_xlabel('FL Round')
-    ax.set_ylabel('Fit Duration (s)')
-    ax.set_title('AOM Benefit: B2 (250 req/s no AOM) vs C1/C2/D1 (AOM on)\n'
-                 'Shaded columns = rounds where AOM excluded overloaded client')
+    ax.legend(handles=handles + [excl_c2], fontsize=9)
+    ax.set_xlabel('Redni broj globalne runde')
+    ax.set_ylabel('Trajanje treniranja (s)')
+    ax.set_title('Učinak selekcijskog algoritma: B2 (AoM isključen) naspram C1/C2 (AoM uključen)')
+    #ax.set_xlabel('FL Round')
+    #ax.set_ylabel('Fit Duration (s)')
+    #ax.set_title('AoM Benefit: B2 (AoM off) vs C1/C2 (AoM on)')
     ax.grid(True, alpha=0.3)
     save(fig, '04_aom_benefit.png')
 
@@ -266,11 +262,10 @@ def plot_accuracy_curves():
                 label=m['short'], linewidth=2, markersize=5)
     ax.set_xlabel('FL Round')
     ax.set_ylabel('Global Accuracy')
-    ax.set_title('Global Model Accuracy per Round - All Experiments\n'
-                 '(Goal 2: AOM does not degrade accuracy)')
+    ax.set_title('Global Model Accuracy per Round')
     ax.legend(fontsize=9, loc='lower right')
     ax.grid(True, alpha=0.3)
-    save(fig, '05_accuracy_curves.png')
+    save(fig, '05_global_accuracy_curves.png')
 
 
 # ============================================================
@@ -294,158 +289,84 @@ def plot_final_accuracy_bar():
 
     baseline = accs[0] * 100
     ax.axhline(y=baseline, color='gray', linestyle='--', linewidth=1.3,
-               label=f'Baseline accuracy = {baseline:.2f}%')
-    ax.axhspan(baseline - 2, baseline + 2, alpha=0.07, color='gray', label='+/-2 pp band')
+               label=f'Baseline accuracy - {baseline:.2f}%')
     ax.set_xticks(range(len(keys)))
     ax.set_xticklabels(xlabels, fontsize=9)
     ax.set_ylim([0, max(accs) * 100 + 5])
     ax.set_ylabel('Final Accuracy (%)')
-    ax.set_title('Final Global Model Accuracy - All Experiments\n'
-                 '(AOM experiments stay within +/-2 pp of baseline)')
+    ax.set_title('Final Global Model Accuracy')
     ax.legend(fontsize=9)
     ax.grid(axis='y', alpha=0.3)
-    save(fig, '06_final_accuracy_bar.png')
+    save(fig, '06_final_global_accuracy.png')
 
 
 # ============================================================
-# PLOT 7 - AOM client selection timeline C1 and C2
-# ============================================================
-def plot_aom_timeline():
-    fig, axes = plt.subplots(3, 1, figsize=(12, 10))
-    for ax, key in zip(axes, ['C1', 'C2', 'D1']):
-        rows = load_ga(key)
-        rnds = [int(r['round']) for r in rows]
-        n_sel = [int(r['num_clients_selected']) for r in rows]
-        bar_colors = [EXPERIMENTS[key]['color'] if n == 3 else '#FF5722' for n in n_sel]
-        ax.bar(rnds, n_sel, color=bar_colors, edgecolor='black', linewidth=0.5, width=0.6)
-        ax.axhline(y=3, color='gray', linestyle='--', linewidth=1, alpha=0.6)
-        ax.set_ylim([0, 3.8])
-        ax.set_yticks([1, 2, 3])
-        ax.set_ylabel('Clients selected')
-        ax.set_xlabel('FL Round')
-        n_excl = sum(1 for n in n_sel if n < 3)
-        ax.set_title(
-            f'{EXPERIMENTS[key]["short"]} - Clients selected per round  '
-            f'({n_excl}/{len(rnds)} rounds: AOM excluded overloaded client)'
-        )
-        full_patch = mpatches.Patch(color=EXPERIMENTS[key]['color'], label='All 3 clients selected')
-        excl_patch = mpatches.Patch(color='#FF5722', label='AOM excluded orinnano-2 (overloaded)')
-        ax.legend(handles=[full_patch, excl_patch], fontsize=9, loc='lower right')
-        ax.grid(axis='y', alpha=0.3)
-    fig.suptitle('AOM Client Selection Timeline', fontsize=13, fontweight='bold', y=1.01)
-    save(fig, '07_aom_timeline.png')
-
-
 # ============================================================
 # PLOT 8 - inflight comparison all load experiments
 # ============================================================
 def plot_inflight_comparison():
     fig, ax = plt.subplots(figsize=(13, 5))
-    for key in ['B1', 'B2', 'C1', 'C2', 'D1', 'D2']:
+    for key in ['B1', 'B2', 'C1', 'C2']:
         rel, vals = proxy_inflight_o2(key)
         m = EXPERIMENTS[key]
         ax.plot(rel, vals, color=m['color'], linewidth=1.4, label=m['short'], alpha=0.9)
-    ax.axhline(y=15, color='red', linestyle='--', linewidth=1.8, label='AOM threshold = 15')
-    ax.set_xlabel('Time since experiment start (minutes)')
-    ax.set_ylabel('inflight_60s_avg  (orinnano-2)')
-    ax.set_title('Proxy Inflight 60s Average - orinnano-2\n'
-                 '(When above threshold, AOM excludes this client from FL training)')
+    ax.axhline(y=15, color='red', linestyle='--', linewidth=1.8, label='AoM prag = 15 zahtjeva/s')
+    ax.set_xlabel('Vrijeme od početka eksperimenta (min)')
+    ax.set_ylabel('Prosječan broj zahtjeva na čekanju u sekundi (zahtjeva/s)')
+    ax.set_title('Prosječan broj zahtjeva na čekanju kod posredničkog poslužitelja orinnano-2')
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.3)
-    save(fig, '08_inflight_comparison.png')
+    save(fig, '08_orinnano2_inflight_comparison.png')
 
 
 # ============================================================
-# PLOT 9 - C2 fit duration boxplot by client count
-# ============================================================
-def plot_duration_by_client_count():
-    rows_c2 = load_ga('C2')
-    d3 = [float(r['fit_duration_s']) for r in rows_c2 if int(r['num_clients_selected']) == 3]
-    d2 = [float(r['fit_duration_s']) for r in rows_c2 if int(r['num_clients_selected']) == 2]
-
-    fig, ax = plt.subplots(figsize=(7, 5))
-    data, labels, colors_bp = [], [], []
-    if d3:
-        data.append(d3)
-        labels.append(f'3 clients selected\n(all included)\nn={len(d3)}')
-        colors_bp.append('#F44336')
-    if d2:
-        data.append(d2)
-        labels.append(f'2 clients selected\n(AOM excluded overloaded)\nn={len(d2)}')
-        colors_bp.append('#4CAF50')
-
-    bp = ax.boxplot(data, patch_artist=True, notch=False, widths=0.45)
-    for patch, color in zip(bp['boxes'], colors_bp):
-        patch.set_facecolor(color)
-        patch.set_alpha(0.7)
-
-    if d3 and d2:
-        gain = np.mean(d3) - np.mean(d2)
-        y_ann = max(max(d3), max(d2)) + 3
-        ax.text(1.5, y_ann, f'AOM reduces mean fit\nby {gain:.1f}s/round',
-                ha='center', fontsize=10,
-                bbox=dict(boxstyle='round,pad=0.4', facecolor='#e8f5e9', edgecolor='darkgreen'))
-
-    ax.set_xticklabels(labels, fontsize=9)
-    ax.set_ylabel('Fit Duration (s)')
-    ax.set_title('C2 (400 req/s, AOM on): Fit Duration by Client Count\n'
-                 'Rounds where AOM excluded the overloaded client are faster')
-    ax.grid(axis='y', alpha=0.3)
-    save(fig, '09_c2_duration_by_client_count.png')
-
-
-# ============================================================
-# PLOT 10 - B2 inflight with FL round windows
+# PLOT 10 - D2 inflight with FL round windows
 # ============================================================
 def plot_inflight_B2_with_rounds():
     fig, ax = plt.subplots(figsize=(13, 5))
     rel, vals = proxy_inflight_o2('B2')
     ax.fill_between(rel, vals, alpha=0.25, color=EXPERIMENTS['B2']['color'])
     ax.plot(rel, vals, color=EXPERIMENTS['B2']['color'], linewidth=1.4,
-            label='inflight_60s_avg (orinnano-2)', zorder=3)
+            label='Inflight Request Average', zorder=3)
 
     for rno, rstart, rend, n_sel in ga_round_windows('B2'):
         ax.axvspan(rstart, rend, alpha=0.10, color='purple', zorder=1)
 
-    ax.axhline(y=15, color='red', linestyle='--', linewidth=1.8, label='AOM threshold = 15')
-    round_patch = mpatches.Patch(color='purple', alpha=0.25, label='FL training round active')
+    ax.axhline(y=15, color='red', linestyle='--', linewidth=1.8, label='AoM threshold = 15')
+    round_patch = mpatches.Patch(color='purple', alpha=0.25, label='Active FL training')
     handles, lbl = ax.get_legend_handles_labels()
     ax.legend(handles=handles + [round_patch], fontsize=9)
-    ax.set_xlabel('Time since experiment start (minutes)')
-    ax.set_ylabel('inflight_60s_avg')
-    ax.set_title('B2 (250 req/s, AOM off): Inflight Spikes During FL Training\n'
-                 'Purple = FL round active - inflight rises above threshold but AOM is OFF')
+    ax.set_xlabel('Time since experiment start (min)')
+    ax.set_ylabel('Prosjek istovremenih zahtjeva (zahtjeva/s)')
+    ax.set_title('B2 (200 zahtjeva/s, AoM isključen): Prosjek istovremenih zahtjeva tijekom FL treniranja na orinnano-2')
     ax.grid(True, alpha=0.3)
-    save(fig, '10_inflight_B2_with_rounds.png')
+    save(fig, '10_b2_inflight_with_rounds.png')
 
 
 # ============================================================
-# PLOT 11 - C2 inflight with AOM action markers
+# PLOT 11 - C2 inflight with AoM action markers
 # ============================================================
-def plot_inflight_C2_aom_action():
+def plot_inflight_C2_AoM_action():
     fig, ax = plt.subplots(figsize=(13, 5))
-    rel, vals = proxy_inflight_o2('C2')
-    ax.fill_between(rel, vals, alpha=0.2, color=EXPERIMENTS['C2']['color'])
-    ax.plot(rel, vals, color=EXPERIMENTS['C2']['color'], linewidth=1.4,
-            label='inflight_60s_avg (orinnano-2)', zorder=3)
+    rel, vals = proxy_inflight_o2('C1')
+    ax.fill_between(rel, vals, alpha=0.2, color=EXPERIMENTS['C1']['color'])
+    ax.plot(rel, vals, color=EXPERIMENTS['C1']['color'], linewidth=1.4,
+            label='Inflight Request Average', zorder=3)
 
-    for rno, rstart, rend, n_sel in ga_round_windows('C2'):
-        shade = '#FF5722' if n_sel < 3 else '#9E9E9E'
-        ax.axvspan(rstart, rend, alpha=0.18, color=shade, zorder=1)
+    for rno, rstart, rend, n_sel in ga_round_windows('C1'):
+        if n_sel < 3:
+            ax.axvspan(rstart, rend, alpha=0.18, color='#FF5722', zorder=1)
 
-    ax.axhline(y=15, color='red', linestyle='--', linewidth=1.8, label='AOM threshold = 15')
+    ax.axhline(y=15, color='red', linestyle='--', linewidth=1.8, label='AoM threshold = 15')
     excl_patch = mpatches.Patch(color='#FF5722', alpha=0.5,
-                                label='Round: AOM excluded orinnano-2')
-    full_patch = mpatches.Patch(color='#9E9E9E', alpha=0.5,
-                                label='Round: all 3 clients selected')
+                                label='Rounds where AoM excluded orinnano-2')
     handles, _ = ax.get_legend_handles_labels()
-    ax.legend(handles=handles + [excl_patch, full_patch], fontsize=9)
-    ax.set_xlabel('Time since experiment start (minutes)')
-    ax.set_ylabel('inflight_60s_avg')
-    ax.set_title('C2 (400 req/s, AOM on): Inflight and AOM Exclusion Events\n'
-                 'Orange = round where AOM excluded orinnano-2; Grey = full participation round')
+    ax.legend(handles=handles + [excl_patch], fontsize=9)
+    ax.set_xlabel('Time since experiment start (min)')
+    ax.set_ylabel('Prosjek istovremenih zahtjeva (zahtjeva/s)')
+    ax.set_title('C1 (250 zahtjeva/s, AoM uključen): Prosjek istovremenih zahtjeva tijekom FL treniranja na orinnano-2')
     ax.grid(True, alpha=0.3)
-    save(fig, '11_inflight_C2_aom_action.png')
+    save(fig, '11_c1_inflight_aom_action.png')
 
 
 # ============================================================
@@ -462,62 +383,194 @@ def plot_loss_curves():
                 label=m['short'], linewidth=2, markersize=5)
     ax.set_xlabel('FL Round')
     ax.set_ylabel('Global Loss')
-    ax.set_title('Global Model Loss per Round - All Experiments')
+    ax.set_title('Global Model Loss per Round')
     ax.legend(fontsize=9, loc='upper right')
     ax.grid(True, alpha=0.3)
-    save(fig, '12_loss_curves.png')
+    save(fig, '12_global_loss_curves.png')
 
 
 # ============================================================
-# PLOT 13 - Cumulative fit time
+# PLOT 15 - Combined: loss curves (top) + final accuracy bar (bottom)
 # ============================================================
-def plot_cumulative_time():
-    fig, ax = plt.subplots(figsize=(11, 5))
+def plot_loss_and_accuracy_combined():
+    keys = list(EXPERIMENTS.keys())
+
+    fig, (ax_loss, ax_acc) = plt.subplots(2, 1, figsize=(11, 10))
+
+    # --- top: loss curves ---
     for key in EXPERIMENTS:
         rows = load_ga(key)
-        durs = [float(r['fit_duration_s']) for r in rows]
-        cum = np.cumsum(durs) / 60
-        rnds = list(range(1, len(durs) + 1))
+        rnds = [int(r['round']) for r in rows]
+        loss = [float(r['loss']) for r in rows]
         m = EXPERIMENTS[key]
-        ax.plot(rnds, cum, marker=m['marker'], color=m['color'],
-                label=m['short'], linewidth=2, markersize=5)
-    ax.set_xlabel('FL Round')
-    ax.set_ylabel('Cumulative Fit Time (minutes)')
-    ax.set_title('Cumulative FL Training Time - All Experiments')
+        ax_loss.plot(rnds, loss, marker=m['marker'], color=m['color'],
+                     label=m['short'], linewidth=2, markersize=5)
+    ax_loss.set_xlabel('FL Round')
+    ax_loss.set_ylabel('Funkcija gubitka')
+    ax_loss.set_title('Funkcija gubitka po globalnoj rundi')
+    ax_loss.legend(fontsize=9, loc='upper right')
+    ax_loss.grid(True, alpha=0.3)
+
+    # --- bottom: final accuracy bar ---
+    accs, colors, xlabels = [], [], []
+    for key in keys:
+        rows = load_ga(key)
+        accs.append(float(rows[-1]['accuracy']))
+        colors.append(EXPERIMENTS[key]['color'])
+        xlabels.append(EXPERIMENTS[key]['label'])
+
+    ax_acc.bar(range(len(keys)), [a * 100 for a in accs],
+               color=colors, alpha=0.85, edgecolor='black', linewidth=0.7)
+    for i, v in enumerate(accs):
+        ax_acc.text(i, v * 100 + 0.15, f'{v*100:.2f}%', ha='center', va='bottom',
+                    fontsize=10, fontweight='bold')
+    baseline = accs[0] * 100
+    ax_acc.axhline(y=baseline, color='gray', linestyle='--', linewidth=1.3,
+                   label=f'Referentna točnost ({baseline:.2f}%)')
+    ax_acc.set_xticks(range(len(keys)))
+    ax_acc.set_xticklabels(xlabels, fontsize=9)
+    ax_acc.set_ylim([0, max(accs) * 100 + 8])
+    ax_acc.set_ylabel('Konačna točnost globalnog modela (%)')
+    ax_acc.set_title('Konačna točnost globalnog modela svih eksperimenata')
+    ax_acc.legend(fontsize=9, loc='lower right')
+    ax_acc.grid(axis='y', alpha=0.3)
+
+    save(fig, '15_loss_and_final_accuracy_combined.png')
+
+
+# ============================================================
+# PLOT 14 - Average per-client fit duration (orinnano-2 vs orinnano-3)
+# ============================================================
+def plot_avg_client_fit():
+    keys = list(EXPERIMENTS.keys())
+    avg_o2, avg_o3, avg_o4 = [], [], []
+    for key in keys:
+        files = CLIENT_LOGS.get(key, ())
+        # orinnano-2 is first file, orinnano-3 is second, orinnano-4 is third
+        def mean_fit_from_file(path):
+            try:
+                with open(path) as f:
+                    rows = list(csv.DictReader(f))
+                fits = [
+                    float(r['duration_s'])
+                    for r in rows
+                    if r.get('phase') == 'fit' and int(r.get('round', 0)) <= MAX_ROUND
+                ]
+                return np.mean(fits) if fits else np.nan
+            except Exception:
+                return np.nan
+
+        o2 = mean_fit_from_file(files[0]) if len(files) > 0 else np.nan
+        o3 = mean_fit_from_file(files[1]) if len(files) > 1 else np.nan
+        o4 = mean_fit_from_file(files[2]) if len(files) > 2 else np.nan
+        avg_o2.append(o2)
+        avg_o3.append(o3)
+        avg_o4.append(o4)
+
+    x = np.arange(len(keys))
+    width = 0.25
+    fig, ax = plt.subplots(figsize=(13, 5))
+    c2_color = '#F44336'  # orinnano-2 (red)
+    c3_color = '#2196F3'  # orinnano-3 (blue)
+    c4_color = '#4CAF50'  # orinnano-4 (green)
+    bars1 = ax.bar(x - width, avg_o2, width, label='orinnano-2', color=c2_color, alpha=0.9)
+    bars2 = ax.bar(x,         avg_o3, width, label='orinnano-3', color=c3_color, alpha=0.9)
+    bars3 = ax.bar(x + width, avg_o4, width, label='orinnano-4', color=c4_color, alpha=0.9)
+
+    # Annotate values
+    for rects in (bars1, bars2, bars3):
+        for rect in rects:
+            h = rect.get_height()
+            if not np.isnan(h):
+                ax.text(rect.get_x() + rect.get_width() / 2, h + 1.0, f'{h:.1f}s', ha='center', va='bottom', fontsize=8)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([EXPERIMENTS[k]['label'] for k in keys], fontsize=9)
+    ax.set_ylabel('Prosječno trajanje lokalne runde treniranja (s)')
+    ax.set_title('Prosječno trajanje lokalne runde treniranja za orinnano-2, orinnano-3 i orinnano-4')
     ax.legend(fontsize=9)
-    ax.grid(True, alpha=0.3)
-    save(fig, '13_cumulative_fit_time.png')
-
-
-# ============================================================
-# PLOT 14 - Request latency distribution B1/B2/C1/C2
-# ============================================================
-def plot_request_latency():
-    fig, ax = plt.subplots(figsize=(10, 5))
-    data, labels, colors_bp = [], [], []
-    for key in ['B1', 'B2', 'C1', 'C2', 'D1', 'D2']:
-        with open(REQUEST_FILES[key]) as f:
-            rows = [r for r in csv.DictReader(f)
-                    if r.get('client_name', '') == 'orinnano-2'
-                    and r.get('status', '') == '200'
-                    and r.get('latency', '').strip() != '']
-        latencies = [float(r['latency']) * 1000 for r in rows]
-        data.append(latencies)
-        labels.append(EXPERIMENTS[key]['label'])
-        colors_bp.append(EXPERIMENTS[key]['color'])
-
-    bp = ax.boxplot(data, patch_artist=True, notch=False, widths=0.45, showfliers=False)
-    for patch, color in zip(bp['boxes'], colors_bp):
-        patch.set_facecolor(color)
-        patch.set_alpha(0.7)
-    ax.set_xticklabels(labels, fontsize=9)
-    ax.set_ylabel('Request Latency (ms)')
-    ax.set_title('Inference Request Latency - orinnano-2 (outliers hidden)\n'
-                 'AOM experiments: inference latency stays comparable to no-AOM')
     ax.grid(axis='y', alpha=0.3)
-    save(fig, '14_request_latency.png')
+    save(fig, '14_avg_client_fit_orinnano2_orinnano3_orinnano4.png')
 
 
+# ============================================================
+# PLOT 16 - Raspberry Pi CPU usage: time series + average bar
+# ============================================================
+def plot_rpi_cpu_usage_over_time():
+    fig, (ax_ts, ax_avg) = plt.subplots(2, 1, figsize=(13, 9))
+    
+    # ===== TOP: Time series (skip A, B1 missing) =====
+    cpu_avgs = {}
+    for key in ['B2', 'C1', 'C2']:
+        rel_path = RPI_LOGS.get(key)
+        if not rel_path or not os.path.exists(rel_path):
+            continue
+
+        with open(rel_path) as f:
+            rows = list(csv.DictReader(f))
+
+        points = [
+            (int(r['timestamp']), float(r['cpu_usage']))
+            for r in rows
+            if r.get('timestamp') and r.get('cpu_usage') not in ('', None)
+        ]
+        if not points:
+            continue
+
+        points.sort(key=lambda x: x[0])
+        t0 = points[0][0]
+        rel_min = [(t - t0) / 60000 for t, _ in points]
+        cpu = [v for _, v in points]
+        cpu_avgs[key] = np.mean(cpu)
+
+        meta = EXPERIMENTS.get(key, {})
+        ax_ts.plot(rel_min, cpu, linewidth=1.2, color=meta.get('color', None),
+                   label=meta.get('short', key), marker=None)
+
+    ax_ts.set_xlabel('Vrijeme od početka eksperimenta (min)')
+    ax_ts.set_ylabel('CPU iskorištenje Raspberry Pi (%)')
+    ax_ts.set_title('CPU iskorištenje Raspberry Pi (globalni agregator) kroz vrijeme')
+    ax_ts.grid(True, alpha=0.3)
+    ax_ts.legend(fontsize=9, loc='upper left')
+
+    # ===== BOTTOM: Average CPU bar chart =====
+    keys_with_data = ['A', 'B2', 'C1', 'C2']  # A has data, B1 missing
+    bars_data = []
+    bars_colors = []
+    bars_labels = []
+    
+    for key in keys_with_data:
+        if key == 'A':
+            # Read A's RPi log to get average
+            rel_path = RPI_LOGS.get('A')
+            if rel_path and os.path.exists(rel_path):
+                with open(rel_path) as f:
+                    rows = list(csv.DictReader(f))
+                cpu = [float(r['cpu_usage']) for r in rows if r.get('cpu_usage') not in ('', None)]
+                if cpu:
+                    bars_data.append(np.mean(cpu))
+                    bars_colors.append(EXPERIMENTS['A'].get('color'))
+                    bars_labels.append(EXPERIMENTS['A'].get('short', 'A'))
+        else:
+            if key in cpu_avgs:
+                bars_data.append(cpu_avgs[key])
+                bars_colors.append(EXPERIMENTS[key].get('color'))
+                bars_labels.append(EXPERIMENTS[key].get('short', key))
+
+    ax_avg.bar(range(len(bars_data)), bars_data, color=bars_colors, alpha=0.85, edgecolor='black', linewidth=0.7)
+    for i, v in enumerate(bars_data):
+        ax_avg.text(i, v + 1.5, f'{v:.1f}%', ha='center', va='bottom', fontsize=10, fontweight='bold')
+    
+    ax_avg.set_xticks(range(len(bars_data)))
+    ax_avg.set_xticklabels(bars_labels, fontsize=9)
+    ax_avg.set_ylabel('Prosječno CPU iskorištenje (%)')
+    ax_avg.set_title('Prosječno CPU iskorištenje Raspberry Pi po eksperimentu')
+    ax_avg.grid(axis='y', alpha=0.3)
+
+    save(fig, '16_rpi_cpu_usage_and_average.png')
+
+
+# ============================================================
 # ============================================================
 # SUMMARY TABLE
 # ============================================================
@@ -526,35 +579,35 @@ def print_summary():
     print('=' * 75)
     print('EXPERIMENT SUMMARY')
     print('=' * 75)
-    print(f'{"Exp":<5} {"Description":<28} {"Rounds":<8} {"Avg Fit (s)":<14} {"Final Acc":<12} {"AOM triggers"}')
+    print(f'{"Exp":<5} {"Description":<28} {"Rounds":<8} {"Avg Fit (s)":<14} {"Final Acc":<12} {"AoM triggers"}')
     print('-' * 75)
     stats = {}
     for key in EXPERIMENTS:
         rows = load_ga(key)
         durs = [float(r['fit_duration_s']) for r in rows]
-        aom  = sum(1 for r in rows if int(r['num_clients_selected']) < 3)
+        AoM  = sum(1 for r in rows if int(r['num_clients_selected']) < 3)
         acc  = float(rows[-1]['accuracy'])
         stats[key] = {'avg': np.mean(durs), 'std': np.std(durs), 'acc': acc,
-                      'aom': aom, 'n': len(rows)}
+                      'AoM': AoM, 'n': len(rows)}
         desc = EXPERIMENTS[key]['short']
-        print(f'{key:<5} {desc:<28} {len(rows):<8} {np.mean(durs):<14.1f} {acc:<12.4f} {aom}/{len(rows)}')
+        print(f'{key:<5} {desc:<28} {len(rows):<8} {np.mean(durs):<14.1f} {acc:<12.4f} {AoM}/{len(rows)}')
 
-    a  = stats['A']['avg'];  b1 = stats['B1']['avg']
-    b2 = stats['B2']['avg']; c1 = stats['C1']['avg']
-    c2 = stats['C2']['avg']
+    a  = stats['A']['avg']
+    b1 = stats['B1']['avg']; b2 = stats['B2']['avg']
+    c1 = stats['C1']['avg']; c2 = stats['C2']['avg']
 
     print()
     print('--- KEY FINDINGS ---')
     print()
-    print('  GOAL 1 - AOM reduces FL round duration under load:')
+    print('  GOAL 1 - AoM reduces FL round duration under load:')
     print(f'    Load increases duration: A={a:.1f}s => B1={b1:.1f}s (+{b1-a:.1f}s) => B2={b2:.1f}s (+{b2-a:.1f}s)')
-    print(f'    AOM at 250 req/s: B2={b2:.1f}s => C1={c1:.1f}s  (delta = {b2-c1:+.1f}s/round)')
-    print(f'    AOM at 400 req/s: B2={b2:.1f}s => C2={c2:.1f}s  (delta = {b2-c2:+.1f}s/round)  <- 400 req/s FASTER than 250 req/s without AOM')
+    print(f'    AoM pri 250 zahtjeva/s: B2={b2:.1f}s => C1={c1:.1f}s  (delta = {b2-c1:+.1f}s/round)')
+    print(f'    AoM pri 400 zahtjeva/s: B2={b2:.1f}s => C2={c2:.1f}s  (delta = {b2-c2:+.1f}s/round)')
     print()
-    print('  GOAL 2 - AOM does not degrade accuracy:')
+    print('  GOAL 2 - AoM does not degrade accuracy:')
     for key in EXPERIMENTS:
         diff = (stats[key]['acc'] - stats['A']['acc']) * 100
-        print(f'    {key}: {stats[key]["acc"]:.4f}  ({diff:+.2f} pp vs baseline)  AOM triggers: {stats[key]["aom"]}/{stats[key]["n"]}')
+        print(f'    {key}: {stats[key]["acc"]:.4f}  ({diff:+.2f} pp vs baseline)  AoM triggers: {stats[key]["AoM"]}/{stats[key]["n"]}')
     print()
 
 
@@ -563,17 +616,15 @@ if __name__ == '__main__':
     print()
     plot_per_round_duration()
     plot_avg_duration_bar()
-    plot_load_effect()
-    plot_aom_benefit()
+    plot_AoM_benefit()
     plot_accuracy_curves()
     plot_final_accuracy_bar()
-    plot_aom_timeline()
     plot_inflight_comparison()
-    plot_duration_by_client_count()
     plot_inflight_B2_with_rounds()
-    plot_inflight_C2_aom_action()
+    plot_inflight_C2_AoM_action()
     plot_loss_curves()
-    plot_cumulative_time()
-    plot_request_latency()
+    plot_avg_client_fit()
+    plot_loss_and_accuracy_combined()
+    plot_rpi_cpu_usage_over_time()
     print_summary()
-    print(f'All 14 plots saved to {OUT_DIR}/')
+    print(f'All plots saved to {OUT_DIR}/')

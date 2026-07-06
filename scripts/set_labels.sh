@@ -1,4 +1,4 @@
-kubectl label --overwrite nodes rpi4-5 fl/type=global_aggregator inf-proxy/node-port=30480 inf-proxy/metrics-node-port=31863 common/image-type=rpi common/use-mps=false
+kubectl label --overwrite nodes rpi4-5 fl/type=global_aggregator inf-proxy/node-port=30480 inf-proxy/metrics-node-port=30481 common/image-type=rpi common/use-mps=false
 
 kubectl label --overwrite nodes orinnano-2 fl/type=client common/image-type=jetson common/use-mps=true
 kubectl label --overwrite nodes orinnano-3 fl/type=client common/image-type=jetson common/use-mps=true

@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.utils.data import DataLoader, Subset, random_split
-from torchvision.transforms import Compose, Normalize, ToTensor
+from torchvision.transforms import Compose, Normalize, ToTensor, RandomCrop, RandomHorizontalFlip
 from torchvision.datasets import CIFAR10
 import torchvision.models as models
 
@@ -77,13 +77,20 @@ def post_training_metrics(metrics_server_url, is_training=None, loss=None, accur
     
 
 def load_data(dataset_dir: str, partition_id: int, num_partitions: int, batch_size: int, num_workers: int = 0, pin_memory: bool = False):
-    transform = Compose([
+    train_transform = Compose([
+        RandomCrop(32, padding=4),
+        RandomHorizontalFlip(),
         ToTensor(),
-        Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
+    ])
+    test_transform = Compose([
+        ToTensor(),
+        Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
     ])
 
     os.makedirs(dataset_dir, exist_ok=True)
-    full_dataset = CIFAR10(root=dataset_dir, train=True, download=True, transform=transform)
+    full_dataset = CIFAR10(root=dataset_dir, train=True, download=True, transform=train_transform)
+    test_dataset_base = CIFAR10(root=dataset_dir, train=True, download=False, transform=test_transform)
     full_dataset = Subset(full_dataset, range(50000))
     total_size = len(full_dataset)
 
@@ -98,8 +105,11 @@ def load_data(dataset_dir: str, partition_id: int, num_partitions: int, batch_si
     test_size = len(partition_dataset) - train_size
     train_subset, test_subset = random_split(partition_dataset, [train_size, test_size], generator=torch.Generator().manual_seed(42))
 
+    test_indices = [indices[i] for i in test_subset.indices]
+    test_subset_clean = Subset(test_dataset_base, test_indices)
+
     trainloader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=pin_memory)
-    testloader = DataLoader(test_subset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=pin_memory)
+    testloader = DataLoader(test_subset_clean, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=pin_memory)
 
     return trainloader, testloader
 
@@ -107,7 +117,7 @@ def load_data(dataset_dir: str, partition_id: int, num_partitions: int, batch_si
 def train(net, trainloader, valloader, epochs, learning_rate, device):
     net.to(device)
     criterion = torch.nn.CrossEntropyLoss().to(device)
-    optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9)
+    optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9, weight_decay=1e-4)
     net.train()
     for epoch in range(epochs):
         epoch_start = time.time()
@@ -147,7 +157,6 @@ def test(net, testloader, device, max_batches=None):
             seen_batches += 1
             if max_batches is not None and seen_batches >= max_batches:
                 break
-
     denom = max(total, 1)
     batch_denom = max(seen_batches, 1)
     accuracy = correct / denom

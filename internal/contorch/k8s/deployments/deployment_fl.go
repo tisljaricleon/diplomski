@@ -2,7 +2,6 @@ package k8sorch
 
 import (
 	"fmt"
-
 	"github.com/AIoTwin-Adaptive-FL-Orch/fl-orchestrator/internal/common"
 	"github.com/AIoTwin-Adaptive-FL-Orch/fl-orchestrator/internal/model"
 	appsv1 "k8s.io/api/apps/v1"

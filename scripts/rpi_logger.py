@@ -25,20 +25,16 @@ def _handle_signal(signum, frame):
 
 
 def _cpu_temp() -> float | None:
-    """Read CPU temperature from sysfs thermal zones."""
     try:
-        # Try psutil first (works on most Linux)
         temps = psutil.sensors_temperatures()
         for key in ("cpu_thermal", "cpu-thermal", "coretemp", "thermal_zone0"):
             if key in temps and temps[key]:
                 return temps[key][0].current
-        # Fallback: first available zone
         for zones in temps.values():
             if zones:
                 return zones[0].current
     except (AttributeError, OSError):
         pass
-    # Direct sysfs fallback
     for i in range(10):
         path = f"/sys/class/thermal/thermal_zone{i}/temp"
         try:

@@ -1,7 +1,6 @@
 import argparse
 import csv
 import datetime
-import datetime as dt  # kept as dt for any existing usage
 import getpass
 import os
 import signal
@@ -49,7 +48,6 @@ FIELDNAMES = [
 def run(output_path: str, interval_s: float) -> None:
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
-    # Always start a fresh log file for each run.
     if os.path.exists(output_path):
         os.remove(output_path)
 

@@ -32,10 +32,12 @@ class FlowerClient(fl.client.NumPyClient):
         self.partition_id = partition_id
         self.model_file = model_file
         self.metrics_server_url = metrics_server_url
+
         init_seed = 42
         torch.manual_seed(init_seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(init_seed)
+
         self.net = Net().to(self.device)
         logging.info(f"[__init__, client {partition_id}] Initialized fresh model with seed={init_seed}")
         _ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -144,7 +146,6 @@ class FlowerClient(fl.client.NumPyClient):
             loss=loss,
             accuracy=accuracy,
         )
-        #post_training_metrics(self.metrics_server_url, is_training=False, loss=loss, accuracy=accuracy)
         return loss, len(self.valloader.dataset), {"accuracy": accuracy,"loss":loss}
     
     

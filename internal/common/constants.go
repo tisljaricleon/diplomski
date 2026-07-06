@@ -55,7 +55,6 @@ const PVC_STORAGE_SIZE = "2Gi"
 
 // Paths
 const FL_DATASET_DIR = "/home/model/dataset"
-const FL_STATE_FILE = "/home/model/state.json"
 const FL_MODEL_FILE = "/home/model/model.pt"
 
 // FL types
